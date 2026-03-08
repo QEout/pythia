@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pythia — Million-Agent World Prediction Engine</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{bg:'#0a0a0f',card:'#12121a',card2:'#0f0f18',border:'#1e1e2e',accent:'#8b5cf6',green:'#22c55e',red:'#ef4444',amber:'#f59e0b',cyan:'#06b6d4',teal:'#14b8a6',rose:'#f43f5e'}}}}</script>
+<style>
+  body{background:#0a0a0f;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif}
+  .glow{box-shadow:0 0 30px rgba(139,92,246,0.15)}
+  .pulse-dot{animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:#1e1e2e;border-radius:3px}
+  .agent-card:hover{transform:translateY(-2px);transition:transform 0.2s}
+  .spread-bar{transition:width 1s ease-out}
+  @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+  .ticker-wrap{overflow:hidden;white-space:nowrap}
+  .ticker-move{display:inline-block;animation:ticker 40s linear infinite}
+  .data-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:9999px;font-size:11px;border:1px solid #1e1e2e}
+  .ring-glow{box-shadow:0 0 0 2px rgba(139,92,246,0.3), 0 0 15px rgba(139,92,246,0.1)}
+  .credibility-ring{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Header -->
+<header class="border-b border-border px-6 py-4 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <span class="text-2xl">🔮</span>
+    <div>
+      <h1 class="text-xl font-bold text-white tracking-tight">Pythia</h1>
+      <p class="text-xs text-gray-500">Million-Agent Swarm Intelligence World Prediction Engine</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-4">
+    <div id="status" class="flex items-center gap-2 text-xs text-gray-400">
+      <span class="w-2 h-2 rounded-full bg-gray-600 pulse-dot" id="status-dot"></span>
+      <span id="status-text">Connecting...</span>
+    </div>
+    <button onclick="loadWorldData()" class="px-3 py-1.5 bg-teal/10 text-teal text-xs rounded-lg hover:bg-teal/20 transition">
+      🌍 World Pulse
+    </button>
+    <button id="btn-predict" onclick="triggerPredict()" class="px-4 py-1.5 bg-accent/20 text-accent text-sm rounded-lg hover:bg-accent/30 transition">
+      ⚡ Run Prediction
+    </button>
+  </div>
+</header>
+
+<!-- Live Ticker -->
+<div class="border-b border-border bg-card2 px-4 py-1.5 ticker-wrap" id="ticker-bar">
+  <div class="ticker-move" id="ticker-content">
+    <span class="text-xs text-gray-500">Loading world data...</span>
+  </div>
+</div>
+
+<main class="max-w-7xl mx-auto p-6 grid gap-6">
+
+  <!-- World Pulse Panel (hidden by default, toggled by button) -->
+  <section id="world-pulse" class="hidden">
+    <h2 class="text-sm font-semibold text-teal uppercase tracking-wider mb-3">🌍 World Pulse — Real-Time Global Intelligence</h2>
+    <div class="grid md:grid-cols-4 gap-3">
+      <div class="bg-card rounded-xl border border-border p-4">
+        <h3 class="text-xs text-amber font-semibold mb-2">🌋 Seismic Activity</h3>
+        <div id="wp-earthquakes" class="space-y-1.5 text-xs text-gray-400 max-h-40 overflow-y-auto">—</div>
+      </div>
+      <div class="bg-card rounded-xl border border-border p-4">
+        <h3 class="text-xs text-cyan font-semibold mb-2">🌡️ Climate Anomalies</h3>
+        <div id="wp-climate" class="space-y-1.5 text-xs text-gray-400 max-h-40 overflow-y-auto">—</div>
+      </div>
+      <div class="bg-card rounded-xl border border-border p-4">
+        <h3 class="text-xs text-rose font-semibold mb-2">⚠️ Global Disruptions</h3>
+        <div id="wp-disruptions" class="space-y-1.5 text-xs text-gray-400 max-h-40 overflow-y-auto">—</div>
+      </div>
+      <div class="bg-card rounded-xl border border-border p-4">
+        <h3 class="text-xs text-green font-semibold mb-2">😱 Fear & Greed</h3>
+        <div id="wp-markets" class="space-y-1.5 text-xs text-gray-400 max-h-40 overflow-y-auto">—</div>
+      </div>
+    </div>
+    <div class="mt-2 text-right">
+      <span class="text-[10px] text-gray-600">Data: USGS Earthquake Hazards · Open-Meteo Climate · GDACS Disaster Alerts · Crypto Fear & Greed Index</span>
+    </div>
+  </section>
+
+  <!-- Stats Bar -->
+  <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+    <div class="bg-card rounded-xl p-4 border border-border">
+      <div class="text-xs text-gray-500 mb-1">Agents</div>
+      <div class="text-2xl font-bold text-white" id="stat-agents">1,000,000</div>
+    </div>
+    <div class="bg-card rounded-xl p-4 border border-border">
+      <div class="text-xs text-gray-500 mb-1">Predictions</div>
+      <div class="text-2xl font-bold text-white" id="stat-predictions">—</div>
+    </div>
+    <div class="bg-card rounded-xl p-4 border border-border">
+      <div class="text-xs text-gray-500 mb-1">Hit Rate</div>
+      <div class="text-2xl font-bold text-green" id="stat-hitrate">—</div>
+    </div>
+    <div class="bg-card rounded-xl p-4 border border-border">
+      <div class="text-xs text-gray-500 mb-1">Population Reached</div>
+      <div class="text-2xl font-bold text-cyan" id="stat-reach">—</div>
+    </div>
+    <div class="bg-card rounded-xl p-4 border border-border">
+      <div class="text-xs text-gray-500 mb-1">Data Sources</div>
+      <div class="text-2xl font-bold text-teal" id="stat-sources">9</div>
+    </div>
+    <div class="bg-card rounded-xl p-4 border border-border">
+      <div class="text-xs text-gray-500 mb-1">Last Round</div>
+      <div class="text-lg font-bold text-white truncate" id="stat-round">—</div>
+    </div>
+  </div>
+
+  <!-- Agent Cards -->
+  <section>
+    <h2 class="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Chief Agents</h2>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" id="agent-grid"></div>
+  </section>
+
+  <!-- Two-column: Predictions + Simulation -->
+  <div class="grid md:grid-cols-3 gap-6">
+
+    <!-- Predictions -->
+    <div class="md:col-span-2 space-y-4">
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Consensus Predictions</h2>
+      <div id="predictions-list" class="space-y-3">
+        <div class="text-gray-600 text-sm">No predictions yet. Click ⚡ Run Prediction to start.</div>
+      </div>
+
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mt-6">🦢 Wildcard Predictions</h2>
+      <div id="wildcards-list" class="space-y-3">
+        <div class="text-gray-600 text-sm">—</div>
+      </div>
+    </div>
+
+    <!-- Simulation -->
+    <div class="space-y-4">
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Population Simulation</h2>
+      <div class="bg-card rounded-xl border border-border p-4">
+        <canvas id="spread-chart" height="200"></canvas>
+      </div>
+      <div class="bg-card rounded-xl border border-border p-4">
+        <h3 class="text-xs text-gray-500 mb-3 font-semibold">Group Sentiment</h3>
+        <div id="group-bars" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Debate Log -->
+  <section>
+    <h2 class="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">⚔️ Roundtable Debate</h2>
+    <div id="debate-log" class="bg-card rounded-xl border border-border p-5 text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+      Waiting for first prediction round...
+    </div>
+  </section>
+
+</main>
+
+<footer class="border-t border-border mt-12 py-6 text-center text-xs text-gray-600">
+  Pythia — Open-source swarm intelligence prediction engine ·
+  <a href="https://github.com/" class="text-accent hover:underline">GitHub</a>
+</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+let ws, spreadChart;
+let agentScores = {};
+
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen = () => {
+    $('#status-dot').className = 'w-2 h-2 rounded-full bg-green pulse-dot';
+    $('#status-text').textContent = 'Connected';
+  };
+  ws.onclose = () => {
+    $('#status-dot').className = 'w-2 h-2 rounded-full bg-red pulse-dot';
+    $('#status-text').textContent = 'Disconnected';
+    setTimeout(connectWS, 3000);
+  };
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'prediction_update') renderPrediction(msg.data);
+    if (msg.type === 'verification_update') loadHistory();
+  };
+}
+
+const domainColors = {
+  politics:'#8b5cf6',tech:'#06b6d4',opinion:'#f59e0b',
+  finance:'#22c55e',culture:'#ec4899',blackswan:'#ef4444',unknown:'#6b7280'
+};
+
+const domainEmoji = {
+  politics:'🏛️',tech:'🔬',opinion:'📱',finance:'💰',culture:'🎭',blackswan:'🦢'
+};
+
+function renderPrediction(data) {
+  if(!data) return;
+
+  $('#stat-round').textContent = data.round_id || '—';
+
+  // Agent cards with credibility rings
+  const grid = $('#agent-grid');
+  grid.innerHTML = '';
+  for (const ca of (data.chief_analyses || [])) {
+    const preds = ca.output?.predictions || [];
+    const score = agentScores[ca.agent] || {accuracy:0, total:0};
+    const acc = score.total > 0 ? Math.round(score.accuracy * 100) : '—';
+    const ringColor = acc === '—' ? '#4b5563' : acc >= 70 ? '#22c55e' : acc >= 40 ? '#f59e0b' : '#ef4444';
+    const card = document.createElement('div');
+    card.className = 'agent-card bg-card rounded-xl border border-border p-3 cursor-default';
+    card.innerHTML = `
+      <div class="flex items-start justify-between mb-1">
+        <span class="text-2xl">${ca.emoji}</span>
+        <div class="credibility-ring" style="border:2px solid ${ringColor};color:${ringColor}" title="Accuracy: ${acc}%">
+          ${acc === '—' ? '—' : acc}
+        </div>
+      </div>
+      <div class="font-semibold text-white text-sm">${ca.agent_cn}</div>
+      <div class="text-xs text-gray-500 mb-2">${ca.agent}</div>
+      <div class="text-xs text-gray-400">${preds.length} prediction${preds.length!==1?'s':''}</div>
+      <div class="text-xs mt-1 text-gray-500 truncate">${ca.output?.analysis?.slice(0,60)||''}...</div>
+    `;
+    grid.appendChild(card);
+  }
+
+  // Consensus predictions
+  const pList = $('#predictions-list');
+  const consensus = data.roundtable?.consensus_predictions || [];
+  if (consensus.length) {
+    pList.innerHTML = '';
+    for (const p of consensus) {
+      const color = domainColors[p.domain] || domainColors.unknown;
+      const emoji = domainEmoji[p.domain] || '❓';
+      const conf = Math.round((p.confidence||0)*100);
+      const div = document.createElement('div');
+      div.className = 'bg-card rounded-xl border border-border p-4';
+      div.innerHTML = `
+        <div class="flex items-start gap-3">
+          <span class="text-xl">${emoji}</span>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${color}22;color:${color}">${p.domain}</span>
+              <span class="text-xs text-gray-500">${conf}% confidence</span>
+              ${p.is_wildcard?'<span class="text-xs px-2 py-0.5 rounded-full bg-red/20 text-red">wildcard</span>':''}
+            </div>
+            <div class="text-white text-sm font-medium">${p.prediction}</div>
+            <div class="text-xs text-gray-500 mt-1">${p.reasoning||''}</div>
+            <div class="text-xs text-gray-600 mt-1">Supporters: ${(p.supporters||[]).join(', ')} ${p.dissenters?.length?'· Dissenters: '+p.dissenters.join(', '):''}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-lg font-bold" style="color:${color}">${conf}%</div>
+          </div>
+        </div>
+      `;
+      pList.appendChild(div);
+    }
+    $('#stat-predictions').textContent = consensus.length;
+  }
+
+  // Wildcards
+  const wList = $('#wildcards-list');
+  const wildcards = data.roundtable?.wildcards || [];
+  if (wildcards.length) {
+    wList.innerHTML = '';
+    for (const w of wildcards) {
+      const div = document.createElement('div');
+      div.className = 'bg-card rounded-xl border border-red/30 p-4';
+      div.innerHTML = `
+        <div class="flex items-start gap-3">
+          <span class="text-xl">🦢</span>
+          <div>
+            <div class="text-white text-sm font-medium">${w.prediction}</div>
+            <div class="text-xs text-gray-500 mt-1">${w.reasoning||''}</div>
+            <div class="text-xs text-red mt-1">Source: ${w.source_agent} · ${Math.round((w.confidence||0)*100)}% confidence</div>
+          </div>
+        </div>
+      `;
+      wList.appendChild(div);
+    }
+  }
+
+  // Debate log
+  $('#debate-log').textContent = data.roundtable?.debate_summary || 'No debate recorded.';
+
+  // Simulation chart
+  const sim = data.simulation;
+  if (sim) {
+    $('#stat-reach').textContent = sim.activation_pct + '%';
+    renderSpreadChart(sim.spread_history || []);
+    renderGroupBars(sim.group_breakdown || {});
+  }
+}
+
+function renderSpreadChart(history) {
+  const ctx = $('#spread-chart').getContext('2d');
+  if (spreadChart) spreadChart.destroy();
+  spreadChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: history.map(h => 'H+' + h.step),
+      datasets: [
+        {
+          label: 'Population Reached (%)',
+          data: history.map(h => h.activation_pct),
+          borderColor: '#06b6d4',
+          backgroundColor: '#06b6d422',
+          fill: true, tension: 0.4,
+        },
+        {
+          label: 'Avg Sentiment',
+          data: history.map(h => h.avg_sentiment * 100),
+          borderColor: '#f59e0b',
+          borderDash: [4,4],
+          fill: false, tension: 0.4,
+          yAxisID: 'y1',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {legend:{labels:{color:'#94a3b8',font:{size:10}}}},
+      scales: {
+        x: {ticks:{color:'#475569',font:{size:9}},grid:{color:'#1e1e2e'}},
+        y: {ticks:{color:'#06b6d4',font:{size:9},callback:v=>v+'%'},grid:{color:'#1e1e2e'},min:0},
+        y1: {position:'right',ticks:{color:'#f59e0b',font:{size:9}},grid:{display:false}},
+      }
+    }
+  });
+}
+
+function renderGroupBars(groups) {
+  const el = $('#group-bars');
+  el.innerHTML = '';
+  const sorted = Object.entries(groups).sort((a,b) => b[1].activated_pct - a[1].activated_pct);
+  for (const [name, g] of sorted) {
+    const sentColor = g.avg_sentiment > 0 ? '#22c55e' : g.avg_sentiment < 0 ? '#ef4444' : '#6b7280';
+    el.innerHTML += `
+      <div class="flex items-center gap-2 text-xs">
+        <span class="w-24 text-gray-400 truncate">${name}</span>
+        <div class="flex-1 bg-border rounded-full h-2 overflow-hidden">
+          <div class="h-full rounded-full spread-bar" style="width:${g.activated_pct}%;background:${sentColor}"></div>
+        </div>
+        <span class="w-12 text-right text-gray-500">${g.activated_pct}%</span>
+      </div>
+    `;
+  }
+}
+
+async function triggerPredict() {
+  const btn = $('#btn-predict');
+  btn.disabled = true;
+  btn.textContent = '⏳ Running...';
+  btn.className = 'px-4 py-1.5 bg-gray-700 text-gray-400 text-sm rounded-lg cursor-wait';
+  try {
+    const r = await fetch('/api/predict', {method:'POST'});
+    const data = await r.json();
+    renderPrediction(data);
+  } catch(e) {
+    console.error(e);
+  }
+  btn.disabled = false;
+  btn.textContent = '⚡ Run Prediction';
+  btn.className = 'px-4 py-1.5 bg-accent/20 text-accent text-sm rounded-lg hover:bg-accent/30 transition';
+}
+
+async function loadHistory() {
+  try {
+    const r = await fetch('/api/history');
+    const data = await r.json();
+    const scores = data.agent_scores || [];
+    if (scores.length) {
+      const total = scores.reduce((s,a) => s + a.total, 0);
+      const hits = scores.reduce((s,a) => s + a.hits, 0);
+      if (total > 0) $('#stat-hitrate').textContent = Math.round(hits/total*100) + '%';
+      for (const s of scores) agentScores[s.agent_name] = s;
+    }
+  } catch(e) {}
+}
+
+async function loadLatest() {
+  try {
+    const r = await fetch('/api/latest');
+    const data = await r.json();
+    if (data.round_id) renderPrediction(data);
+  } catch(e) {}
+}
+
+// World Pulse toggle and data loading
+async function loadWorldData() {
+  const panel = $('#world-pulse');
+  panel.classList.toggle('hidden');
+  if (!panel.classList.contains('hidden')) {
+    try {
+      const r = await fetch('/api/world');
+      const d = await r.json();
+      renderWorldPulse(d);
+      buildTicker(d);
+    } catch(e) {
+      console.error('World data load failed', e);
+    }
+  }
+}
+
+function renderWorldPulse(d) {
+  const eq = d.earthquakes || [];
+  const cl = d.climate || [];
+  const dis = d.disruptions || [];
+  const mk = d.markets || [];
+
+  $('#wp-earthquakes').innerHTML = eq.length ? eq.map(q =>
+    `<div class="flex items-center gap-1"><span class="text-amber">${q.magnitude ? 'M'+q.magnitude : '•'}</span> ${q.title || q.location}</div>`
+  ).join('') : '<span class="text-gray-600">No seismic data</span>';
+
+  $('#wp-climate').innerHTML = cl.length ? cl.map(c =>
+    `<div>${c.title || c.type || 'Anomaly'} <span class="text-gray-600">${c.region || ''}</span></div>`
+  ).join('') : '<span class="text-gray-600">No climate data</span>';
+
+  $('#wp-disruptions').innerHTML = dis.length ? dis.map(a => {
+    const sev = a.severity === 'red' ? 'text-red' : a.severity === 'orange' ? 'text-amber' : 'text-gray-400';
+    return `<div class="${sev}">${a.title} <span class="text-gray-600">${a.country || ''}</span></div>`;
+  }).join('') : '<span class="text-gray-600">No alerts</span>';
+
+  $('#wp-markets').innerHTML = mk.length ? mk.map(m => {
+    const val = m.value;
+    const color = val > 50 ? 'text-green' : val < 30 ? 'text-red' : 'text-amber';
+    return `<div class="${color} font-semibold">${m.title}</div>`;
+  }).join('') : '<span class="text-gray-600">No data</span>';
+}
+
+function buildTicker(d) {
+  const items = [];
+  for (const q of (d.earthquakes || []).slice(0,5))
+    items.push(`<span class="data-tag bg-amber/10 text-amber">🌋 M${q.magnitude||'?'} ${q.location||''}</span>`);
+  for (const m of (d.markets || []).slice(0,2)) {
+    const val = m.value;
+    const cls = val > 50 ? 'bg-green/10 text-green' : val < 30 ? 'bg-red/10 text-red' : 'bg-amber/10 text-amber';
+    items.push(`<span class="data-tag ${cls}">😱 ${m.classification||''} (${val})</span>`);
+  }
+  for (const a of (d.disruptions || []).slice(0,3))
+    items.push(`<span class="data-tag bg-rose/10 text-rose">⚠️ ${a.title}</span>`);
+  for (const c of (d.climate || []).slice(0,3))
+    items.push(`<span class="data-tag bg-cyan/10 text-cyan">🌡️ ${c.region}: ${c.temperature}°C</span>`);
+  if (items.length) {
+    const html = items.join(' &nbsp; ');
+    $('#ticker-content').innerHTML = html + ' &nbsp;&nbsp;&nbsp; ' + html;
+  }
+}
+
+connectWS();
+loadLatest();
+loadHistory();
+
+// Auto-load ticker on startup
+fetch('/api/world').then(r=>r.json()).then(d=>{buildTicker(d)}).catch(()=>{});
+</script>
+</body>
+</html>
