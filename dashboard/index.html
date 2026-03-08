@@ -42,6 +42,9 @@
     <button onclick="loadWorldData()" class="px-3 py-1.5 bg-teal/10 text-teal text-xs rounded-lg hover:bg-teal/20 transition">
       🌍 World Pulse
     </button>
+    <button onclick="toggleEntities()" class="px-3 py-1.5 bg-accent/10 text-accent text-xs rounded-lg hover:bg-accent/20 transition">
+      🕸️ Entities
+    </button>
     <button id="btn-predict" onclick="triggerPredict()" class="px-4 py-1.5 bg-accent/20 text-accent text-sm rounded-lg hover:bg-accent/30 transition">
       ⚡ Run Prediction
     </button>
@@ -78,8 +81,32 @@
         <div id="wp-markets" class="space-y-1.5 text-xs text-gray-400 max-h-40 overflow-y-auto">—</div>
       </div>
     </div>
+    <div class="grid md:grid-cols-3 gap-3 mt-3">
+      <div class="bg-card rounded-xl border border-border p-4">
+        <h3 class="text-xs text-red font-semibold mb-2">⚔️ Armed Conflicts (ACLED)</h3>
+        <div id="wp-conflicts" class="space-y-1.5 text-xs text-gray-400 max-h-40 overflow-y-auto">—</div>
+      </div>
+      <div class="bg-card rounded-xl border border-border p-4">
+        <h3 class="text-xs text-accent font-semibold mb-2">🎯 Prediction Markets</h3>
+        <div id="wp-polymarket" class="space-y-1.5 text-xs text-gray-400 max-h-40 overflow-y-auto">—</div>
+      </div>
+      <div class="bg-card rounded-xl border border-border p-4">
+        <h3 class="text-xs text-amber font-semibold mb-2">🔥 Active Fires (NASA)</h3>
+        <div id="wp-fires" class="space-y-1.5 text-xs text-gray-400 max-h-40 overflow-y-auto">—</div>
+      </div>
+    </div>
     <div class="mt-2 text-right">
-      <span class="text-[10px] text-gray-600">Data: USGS Earthquake Hazards · Open-Meteo Climate · GDACS Disaster Alerts · Crypto Fear & Greed Index</span>
+      <span class="text-[10px] text-gray-600">Data: USGS · Open-Meteo · GDACS · Fear & Greed · ACLED · Polymarket · NASA FIRMS · GDELT · 30+ RSS feeds</span>
+    </div>
+  </section>
+
+  <!-- Entity Graph Panel -->
+  <section id="entity-panel" class="hidden">
+    <h2 class="text-sm font-semibold text-accent uppercase tracking-wider mb-3">🕸️ Knowledge Graph — Trending Entities</h2>
+    <div class="bg-card rounded-xl border border-border p-4">
+      <div id="entity-list" class="flex flex-wrap gap-2">
+        <span class="text-xs text-gray-600">Run a prediction to populate entity graph...</span>
+      </div>
     </div>
   </section>
 
@@ -103,7 +130,7 @@
     </div>
     <div class="bg-card rounded-xl p-4 border border-border">
       <div class="text-xs text-gray-500 mb-1">Data Sources</div>
-      <div class="text-2xl font-bold text-teal" id="stat-sources">9</div>
+      <div class="text-2xl font-bold text-teal" id="stat-sources">13</div>
     </div>
     <div class="bg-card rounded-xl p-4 border border-border">
       <div class="text-xs text-gray-500 mb-1">Last Round</div>
@@ -409,6 +436,9 @@ function renderWorldPulse(d) {
   const cl = d.climate || [];
   const dis = d.disruptions || [];
   const mk = d.markets || [];
+  const conflicts = d.conflicts || [];
+  const pm = d.prediction_markets || [];
+  const fires = d.fires || [];
 
   $('#wp-earthquakes').innerHTML = eq.length ? eq.map(q =>
     `<div class="flex items-center gap-1"><span class="text-amber">${q.magnitude ? 'M'+q.magnitude : '•'}</span> ${q.title || q.location}</div>`
@@ -428,6 +458,20 @@ function renderWorldPulse(d) {
     const color = val > 50 ? 'text-green' : val < 30 ? 'text-red' : 'text-amber';
     return `<div class="${color} font-semibold">${m.title}</div>`;
   }).join('') : '<span class="text-gray-600">No data</span>';
+
+  $('#wp-conflicts').innerHTML = conflicts.length ? conflicts.slice(0,8).map(c => {
+    const sev = c.severity === 'critical' ? 'text-red' : c.severity === 'high' ? 'text-amber' : 'text-gray-400';
+    return `<div class="${sev}">${c.title} <span class="text-gray-600">${c.fatalities ? c.fatalities+' casualties' : ''}</span></div>`;
+  }).join('') : '<span class="text-gray-600">No conflict data</span>';
+
+  $('#wp-polymarket').innerHTML = pm.length ? pm.slice(0,6).map(m =>
+    `<div><span class="text-accent">${m.title}</span> <span class="text-gray-600 text-[10px]">${m.probability || ''}</span></div>`
+  ).join('') : '<span class="text-gray-600">No prediction markets</span>';
+
+  $('#wp-fires').innerHTML = fires.length ? fires.slice(0,6).map(f => {
+    const sev = f.severity === 'critical' ? 'text-red' : f.severity === 'high' ? 'text-amber' : 'text-gray-400';
+    return `<div class="${sev}">${f.title}</div>`;
+  }).join('') : '<span class="text-gray-600">No fire data</span>';
 }
 
 function buildTicker(d) {
@@ -448,6 +492,55 @@ function buildTicker(d) {
     $('#ticker-content').innerHTML = html + ' &nbsp;&nbsp;&nbsp; ' + html;
   }
 }
+
+// Entity panel
+async function toggleEntities() {
+  const panel = $('#entity-panel');
+  panel.classList.toggle('hidden');
+  if (!panel.classList.contains('hidden')) {
+    try {
+      const r = await fetch('/api/entities');
+      const entities = await r.json();
+      renderEntities(entities);
+    } catch(e) { console.error('Entity load failed', e); }
+  }
+}
+
+function renderEntities(entities) {
+  const el = $('#entity-list');
+  if (!entities || !entities.length) {
+    el.innerHTML = '<span class="text-xs text-gray-600">No entities yet — run a prediction first.</span>';
+    return;
+  }
+  const typeColors = {
+    country:'bg-blue-500/20 text-blue-400', person:'bg-purple-500/20 text-purple-400',
+    company:'bg-cyan/20 text-cyan', organization:'bg-teal/20 text-teal',
+    crypto:'bg-amber/20 text-amber', topic:'bg-rose/20 text-rose',
+    index:'bg-green/20 text-green', event_type:'bg-red/20 text-red',
+  };
+  el.innerHTML = entities.map(e => {
+    const cls = typeColors[e.entity_type] || 'bg-gray-700/30 text-gray-400';
+    const size = Math.min(14, 10 + e.mention_count);
+    return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full ${cls}" style="font-size:${size}px">
+      ${e.entity} <span class="opacity-50 text-[9px]">×${e.mention_count}</span>
+    </span>`;
+  }).join('');
+}
+
+// Update prediction render with source count and entity data
+const origRenderPrediction = renderPrediction;
+renderPrediction = function(data) {
+  origRenderPrediction(data);
+  if (data && data.source_count) {
+    $('#stat-sources').textContent = data.source_count;
+  }
+  if (data && data.top_entities && data.top_entities.length) {
+    const mapped = data.top_entities.map(([name,count]) => ({entity:name, entity_type:'topic', mention_count:count}));
+    renderEntities(mapped);
+    const panel = $('#entity-panel');
+    if (panel.classList.contains('hidden')) panel.classList.remove('hidden');
+  }
+};
 
 connectWS();
 loadLatest();

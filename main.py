@@ -21,6 +21,7 @@ from db.store import (
 )
 from engine.prediction import run_prediction_cycle
 from engine.verification import verify_predictions
+from agents.memory import init_memory_tables, get_trending_entities
 
 logging.basicConfig(
     level=logging.INFO,
@@ -66,6 +67,7 @@ async def scheduled_verification():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    init_memory_tables()
     scheduler.add_job(scheduled_prediction, "interval", hours=PREDICTION_INTERVAL_HOURS, id="predict")
     scheduler.add_job(scheduled_verification, "interval", hours=12, id="verify")
     scheduler.start()
@@ -122,19 +124,35 @@ async def get_history():
 
 @app.get("/api/world")
 async def get_world_data():
-    """Fetch current WorldMonitor data for the dashboard."""
+    """Fetch current WorldMonitor + extended intelligence data for the dashboard."""
     from data.sources.worldmonitor import fetch_all_worldmonitor
+    from data.sources.acled import fetch_acled_conflicts
+    from data.sources.polymarket import fetch_polymarket
+    from data.sources.nasa_firms import fetch_active_fires
+    from data.cache import cached_fetch, TTL_LONG, TTL_MEDIUM, TTL_EXTENDED
     try:
-        data = await fetch_all_worldmonitor()
-        return JSONResponse(data)
+        wm, conflicts, markets, fires = await asyncio.gather(
+            cached_fetch("worldmonitor", fetch_all_worldmonitor, TTL_LONG),
+            cached_fetch("acled", fetch_acled_conflicts, TTL_EXTENDED),
+            cached_fetch("polymarket", fetch_polymarket, TTL_MEDIUM),
+            cached_fetch("fires", fetch_active_fires, TTL_LONG),
+            return_exceptions=True,
+        )
+        result = wm if isinstance(wm, dict) else {"earthquakes": [], "climate": [], "disruptions": [], "markets": []}
+        result["conflicts"] = conflicts if isinstance(conflicts, list) else []
+        result["prediction_markets"] = markets if isinstance(markets, list) else []
+        result["fires"] = fires if isinstance(fires, list) else []
+        result["signals"] = []
+        return JSONResponse(result)
     except Exception as e:
-        log.error("WorldMonitor fetch failed: %s", e)
-        return JSONResponse({"earthquakes": [], "climate": [], "aviation": [], "markets": [], "signals": []})
+        log.error("World data fetch failed: %s", e)
+        return JSONResponse({"earthquakes": [], "climate": [], "disruptions": [], "markets": [], "signals": []})
 
 
 @app.get("/api/agents")
 async def get_agents():
     from agents.chief_agents import CHIEFS
+    from agents.memory import get_agent_episodic_memory
     scores = {s["agent_name"]: s for s in get_agent_scores()}
     return JSONResponse([
         {
@@ -144,9 +162,24 @@ async def get_agents():
             "domain": a.domain,
             "personality": a.personality,
             "score": scores.get(a.name, {"total": 0, "hits": 0, "accuracy": 0}),
+            "recent_memory": get_agent_episodic_memory(a.name, limit=5),
         }
         for a in CHIEFS
     ])
+
+
+@app.get("/api/entities")
+async def get_entities():
+    """Get trending entities from the knowledge graph."""
+    entities = get_trending_entities(20)
+    return JSONResponse(entities)
+
+
+@app.get("/api/cache")
+async def get_cache_status():
+    """Cache diagnostics endpoint."""
+    from data.cache import cache_stats
+    return JSONResponse(cache_stats())
 
 
 @app.websocket("/ws")

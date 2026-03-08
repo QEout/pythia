@@ -1,4 +1,8 @@
-"""Verification engine — checks yesterday's predictions against today's reality."""
+"""Verification engine — checks yesterday's predictions against today's reality.
+
+Enhanced with memory feedback: verification results are written back into agent
+episodic memory so agents learn from their hits and misses (MiroFish-inspired).
+"""
 
 from __future__ import annotations
 import json
@@ -9,6 +13,7 @@ from openai import OpenAI
 from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 from data.collector import collect_world_data
 from db.store import get_unverified_predictions, mark_verified, update_agent_score
+from agents.memory import update_memory_outcome
 
 log = logging.getLogger(__name__)
 
@@ -26,7 +31,8 @@ Output STRICT JSON:
 {
   "verdict": "hit" | "partial" | "miss",
   "explanation": "1-2 sentence explanation of why this is a hit/partial/miss",
-  "evidence": "specific data point from current data that supports your verdict"
+  "evidence": "specific data point from current data that supports your verdict",
+  "lesson": "1 sentence about what the agent should learn from this outcome for future predictions"
 }"""
 
 
@@ -54,7 +60,7 @@ async def verify_predictions():
                     {"role": "user", "content": f"PREDICTION (made at {pred['ts']}):\n{pred['prediction']}\n\nCURRENT WORLD DATA:\n{current_data}\n\nVerify. Output JSON only."},
                 ],
                 temperature=0.2,
-                max_tokens=300,
+                max_tokens=400,
                 response_format={"type": "json_object"},
             )
             text = resp.choices[0].message.content or "{}"
@@ -65,6 +71,13 @@ async def verify_predictions():
 
             mark_verified(pred["id"], hit, note)
             update_agent_score(pred["agent_name"], hit)
+
+            update_memory_outcome(
+                agent_name=pred["agent_name"],
+                prediction=pred["prediction"],
+                outcome=verdict.get("verdict", "miss"),
+                lesson=verdict.get("lesson", ""),
+            )
 
             results.append({
                 "prediction_id": pred["id"],

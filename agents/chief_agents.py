@@ -1,4 +1,8 @@
-"""Six Chief Agents — each a domain expert with distinct personality."""
+"""Six Chief Agents — each a domain expert with distinct personality.
+
+Enhanced with MiroFish-inspired memory: each agent receives its own prediction
+history + outcomes, enabling cross-round learning and confidence calibration.
+"""
 
 from __future__ import annotations
 import json
@@ -7,6 +11,7 @@ from dataclasses import dataclass
 from openai import OpenAI
 
 from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+from agents.memory import format_memory_prompt, format_entity_context
 
 log = logging.getLogger(__name__)
 
@@ -233,13 +238,26 @@ Output STRICT JSON:
 
 
 async def run_chief_agent(agent: ChiefAgent, world_summary: str) -> dict:
-    """Run a single chief agent against world data, return parsed JSON."""
+    """Run a single chief agent against world data, return parsed JSON.
+
+    Enhanced with MiroFish-inspired memory injection: each agent receives its
+    prediction history and the shared entity graph for cross-round learning.
+    """
+    memory_section = format_memory_prompt(agent.name)
+    entity_section = format_entity_context()
+    context_parts = [f"Current world data (collected just now):\n\n{world_summary}"]
+    if memory_section:
+        context_parts.append(memory_section)
+    if entity_section:
+        context_parts.append(entity_section)
+    context_parts.append("Analyze and predict. Output JSON only.")
+
     try:
         resp = client.chat.completions.create(
             model=DEEPSEEK_MODEL,
             messages=[
                 {"role": "system", "content": agent.system_prompt},
-                {"role": "user", "content": f"Current world data (collected just now):\n\n{world_summary}\n\nAnalyze and predict. Output JSON only."},
+                {"role": "user", "content": "\n\n".join(context_parts)},
             ],
             temperature=0.7,
             max_tokens=1000,
