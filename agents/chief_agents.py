@@ -10,7 +10,7 @@ import logging
 from dataclasses import dataclass
 from openai import OpenAI
 
-from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, PREDICTION_LANGUAGE
 from agents.memory import format_memory_prompt, format_entity_context
 
 log = logging.getLogger(__name__)
@@ -245,12 +245,18 @@ async def run_chief_agent(agent: ChiefAgent, world_summary: str) -> dict:
     """
     memory_section = format_memory_prompt(agent.name)
     entity_section = format_entity_context()
+    lang_instruction = ""
+    if PREDICTION_LANGUAGE == "zh":
+        lang_instruction = "\n\nIMPORTANT: Write ALL text fields (analysis, prediction, reasoning, dissent) in Chinese (中文). Output JSON keys stay in English."
+    elif PREDICTION_LANGUAGE == "both":
+        lang_instruction = "\n\nIMPORTANT: For each prediction, write the 'prediction' field in BOTH English and Chinese, separated by ' | '. Example: 'BTC drops below 60k | 比特币跌破6万'. Analysis and reasoning in English."
+
     context_parts = [f"Current world data (collected just now):\n\n{world_summary}"]
     if memory_section:
         context_parts.append(memory_section)
     if entity_section:
         context_parts.append(entity_section)
-    context_parts.append("Analyze and predict. Output JSON only.")
+    context_parts.append(f"Analyze and predict. Output JSON only.{lang_instruction}")
 
     try:
         resp = client.chat.completions.create(

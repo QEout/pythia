@@ -1,0 +1,94 @@
+{
+  "app": {
+    "title": "Pythia",
+    "subtitle": "Million-Agent Swarm Intelligence Prediction Engine",
+    "tagline": "WorldMonitor shows what's happening. Pythia tells you what happens next."
+  },
+  "nav": {
+    "worldPulse": "World Pulse",
+    "entities": "Entities",
+    "runPrediction": "Run Prediction",
+    "running": "Analyzing...",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "language": "中文"
+  },
+  "tabs": {
+    "dashboard": "Dashboard",
+    "world": "World Intel",
+    "entities": "Knowledge Graph"
+  },
+  "stats": {
+    "agents": "Agents",
+    "agentsSub": "simulation population",
+    "predictions": "Predictions",
+    "predictionsSub": "this round",
+    "hitRate": "Hit Rate",
+    "reached": "Population Reached",
+    "reachedSub": "information spread",
+    "sources": "Data Sources",
+    "sourcesSub": "all free / open",
+    "lastRound": "Last Round"
+  },
+  "sections": {
+    "chiefAgents": "Chief Agents",
+    "active": "active",
+    "consensus": "Consensus Predictions",
+    "wildcards": "Wildcard Predictions",
+    "simulation": "Population Simulation",
+    "spreadCurve": "Information Spread Curve",
+    "sentiment": "Group Sentiment",
+    "debate": "Roundtable Debate",
+    "worldPulse": "World Pulse — Real-Time Global Intelligence",
+    "entities": "Knowledge Graph — Trending Entities",
+    "sourceHealth": "Data Sources",
+    "noData": "No predictions yet. Click Run Prediction to start.",
+    "waiting": "Waiting for first prediction round...",
+    "translate": "Translate"
+  },
+  "domains": {
+    "politics": "Politics",
+    "tech": "Tech",
+    "opinion": "Opinion",
+    "finance": "Finance",
+    "culture": "Culture",
+    "blackswan": "Black Swan",
+    "unknown": "Unknown"
+  },
+  "agents": {
+    "Strategist": "Strategist",
+    "Technomancer": "Technomancer",
+    "Voxhunter": "Voxhunter",
+    "Sharktooth": "Sharktooth",
+    "Zeitgeist": "Zeitgeist",
+    "Cassandra": "Cassandra"
+  },
+  "world": {
+    "earthquakes": "Seismic Activity",
+    "climate": "Climate Anomalies",
+    "disruptions": "Global Disruptions",
+    "fearGreed": "Fear & Greed",
+    "conflicts": "Armed Conflicts",
+    "polymarket": "Prediction Markets",
+    "fires": "Active Fires",
+    "noData": "No data",
+    "casualties": "casualties",
+    "dataAttribution": "USGS · Open-Meteo · GDACS · ACLED · Polymarket · NASA FIRMS · GDELT · 30+ RSS"
+  },
+  "groups": {
+    "tech_worker": "Tech Workers",
+    "finance_pro": "Finance Pros",
+    "student": "Students",
+    "blue_collar": "Blue Collar",
+    "retiree": "Retirees",
+    "entrepreneur": "Entrepreneurs",
+    "media_worker": "Media Workers",
+    "govt_employee": "Govt Employees",
+    "gig_worker": "Gig Workers",
+    "homemaker": "Homemakers"
+  },
+  "confidence": "confidence",
+  "wildcard": "wildcard",
+  "supporters": "Supporters",
+  "dissenters": "Dissenters"
+}

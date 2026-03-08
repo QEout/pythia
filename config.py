@@ -16,3 +16,4 @@ DB_PATH = os.getenv("DB_PATH", "pythia.db")
 
 CACHE_TTL_DEFAULT = int(os.getenv("CACHE_TTL_DEFAULT", "300"))
 DEEP_ENTITY_EXTRACTION = os.getenv("DEEP_ENTITY_EXTRACTION", "false").lower() == "true"
+PREDICTION_LANGUAGE = os.getenv("PREDICTION_LANGUAGE", "en")  # "en", "zh", or "both"

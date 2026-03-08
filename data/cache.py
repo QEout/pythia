@@ -81,8 +81,19 @@ TTL_EXTENDED = 3600  # 1 hr — very stable data (ACLED conflicts, GDELT)
 
 
 def cache_stats() -> dict:
-    """Return cache diagnostics."""
+    """Return cache diagnostics with per-entry detail for the frontend."""
     now = time.time()
     total = len(_cache)
     alive = sum(1 for exp, _ in _cache.values() if exp > now)
-    return {"total_entries": total, "alive": alive, "stale": total - alive}
+    entries = []
+    for key, (expires_at, _) in _cache.items():
+        age = now - (expires_at - 900)  # rough age estimate assuming TTL ~15m
+        is_stale = now >= expires_at
+        ttl_remaining = max(0, expires_at - now)
+        entries.append({
+            "key": key,
+            "age_seconds": round(age),
+            "ttl": round(ttl_remaining),
+            "stale": is_stale,
+        })
+    return {"total_entries": total, "alive": alive, "stale": total - alive, "entries": entries}

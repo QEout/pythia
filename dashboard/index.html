@@ -223,10 +223,43 @@ const domainEmoji = {
   politics:'🏛️',tech:'🔬',opinion:'📱',finance:'💰',culture:'🎭',blackswan:'🦢'
 };
 
+const entityTypeColors = {
+  country:'bg-blue-500/20 text-blue-400', person:'bg-purple-500/20 text-purple-400',
+  company:'bg-cyan/20 text-cyan', organization:'bg-teal/20 text-teal',
+  crypto:'bg-amber/20 text-amber', topic:'bg-rose/20 text-rose',
+  index:'bg-green/20 text-green', event_type:'bg-red/20 text-red',
+};
+
+function renderEntities(entities) {
+  const el = $('#entity-list');
+  if (!el) return;
+  if (!entities || !entities.length) {
+    el.innerHTML = '<span class="text-xs text-gray-600">No entities yet — run a prediction first.</span>';
+    return;
+  }
+  el.innerHTML = entities.map(e => {
+    const cls = entityTypeColors[e.entity_type] || 'bg-gray-700/30 text-gray-400';
+    const size = Math.min(14, 10 + (e.mention_count || 1));
+    return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full ${cls}" style="font-size:${size}px">
+      ${e.entity} <span class="opacity-50 text-[9px]">×${e.mention_count||1}</span>
+    </span>`;
+  }).join('');
+}
+
 function renderPrediction(data) {
   if(!data) return;
+  console.log('renderPrediction called:', data);
 
   $('#stat-round').textContent = data.round_id || '—';
+  if (data.source_count) $('#stat-sources').textContent = data.source_count;
+
+  // Render entities if present
+  if (data.top_entities && data.top_entities.length) {
+    const mapped = data.top_entities.map(e => ({entity: e[0], entity_type:'topic', mention_count: e[1]}));
+    renderEntities(mapped);
+    const ep = $('#entity-panel');
+    if (ep && ep.classList.contains('hidden')) ep.classList.remove('hidden');
+  }
 
   // Agent cards with credibility rings
   const grid = $('#agent-grid');
@@ -383,14 +416,18 @@ async function triggerPredict() {
   btn.className = 'px-4 py-1.5 bg-gray-700 text-gray-400 text-sm rounded-lg cursor-wait';
   try {
     const r = await fetch('/api/predict', {method:'POST'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
+    console.log('Prediction result:', data);
     renderPrediction(data);
   } catch(e) {
-    console.error(e);
+    console.error('Prediction failed:', e);
+    alert('Prediction request failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚡ Run Prediction';
+    btn.className = 'px-4 py-1.5 bg-accent/20 text-accent text-sm rounded-lg hover:bg-accent/30 transition';
   }
-  btn.disabled = false;
-  btn.textContent = '⚡ Run Prediction';
-  btn.className = 'px-4 py-1.5 bg-accent/20 text-accent text-sm rounded-lg hover:bg-accent/30 transition';
 }
 
 async function loadHistory() {
@@ -505,42 +542,6 @@ async function toggleEntities() {
     } catch(e) { console.error('Entity load failed', e); }
   }
 }
-
-function renderEntities(entities) {
-  const el = $('#entity-list');
-  if (!entities || !entities.length) {
-    el.innerHTML = '<span class="text-xs text-gray-600">No entities yet — run a prediction first.</span>';
-    return;
-  }
-  const typeColors = {
-    country:'bg-blue-500/20 text-blue-400', person:'bg-purple-500/20 text-purple-400',
-    company:'bg-cyan/20 text-cyan', organization:'bg-teal/20 text-teal',
-    crypto:'bg-amber/20 text-amber', topic:'bg-rose/20 text-rose',
-    index:'bg-green/20 text-green', event_type:'bg-red/20 text-red',
-  };
-  el.innerHTML = entities.map(e => {
-    const cls = typeColors[e.entity_type] || 'bg-gray-700/30 text-gray-400';
-    const size = Math.min(14, 10 + e.mention_count);
-    return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full ${cls}" style="font-size:${size}px">
-      ${e.entity} <span class="opacity-50 text-[9px]">×${e.mention_count}</span>
-    </span>`;
-  }).join('');
-}
-
-// Update prediction render with source count and entity data
-const origRenderPrediction = renderPrediction;
-renderPrediction = function(data) {
-  origRenderPrediction(data);
-  if (data && data.source_count) {
-    $('#stat-sources').textContent = data.source_count;
-  }
-  if (data && data.top_entities && data.top_entities.length) {
-    const mapped = data.top_entities.map(([name,count]) => ({entity:name, entity_type:'topic', mention_count:count}));
-    renderEntities(mapped);
-    const panel = $('#entity-panel');
-    if (panel.classList.contains('hidden')) panel.classList.remove('hidden');
-  }
-};
 
 connectWS();
 loadLatest();

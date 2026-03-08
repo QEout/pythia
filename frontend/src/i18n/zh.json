@@ -1,0 +1,94 @@
+{
+  "app": {
+    "title": "Pythia 预言机",
+    "subtitle": "百万智能体群体智能预测引擎",
+    "tagline": "WorldMonitor 展示正在发生的事。Pythia 告诉你接下来会发生什么。"
+  },
+  "nav": {
+    "worldPulse": "全球脉搏",
+    "entities": "知识图谱",
+    "runPrediction": "启动预测",
+    "running": "分析中...",
+    "connected": "已连接",
+    "disconnected": "已断开",
+    "language": "EN"
+  },
+  "tabs": {
+    "dashboard": "仪表盘",
+    "world": "全球情报",
+    "entities": "知识图谱"
+  },
+  "stats": {
+    "agents": "智能体",
+    "agentsSub": "仿真群体规模",
+    "predictions": "预测数",
+    "predictionsSub": "本轮",
+    "hitRate": "命中率",
+    "reached": "传播覆盖",
+    "reachedSub": "信息扩散率",
+    "sources": "数据源",
+    "sourcesSub": "全部免费/开放",
+    "lastRound": "最近轮次"
+  },
+  "sections": {
+    "chiefAgents": "首席智能体",
+    "active": "在线",
+    "consensus": "共识预测",
+    "wildcards": "黑天鹅预测",
+    "simulation": "群体传播仿真",
+    "spreadCurve": "信息扩散曲线",
+    "sentiment": "群体情绪分布",
+    "debate": "圆桌辩论",
+    "worldPulse": "全球脉搏 — 实时全球情报",
+    "entities": "知识图谱 — 热门实体",
+    "sourceHealth": "数据源状态",
+    "noData": "暂无预测。点击「启动预测」开始。",
+    "waiting": "等待首次预测...",
+    "translate": "翻译"
+  },
+  "domains": {
+    "politics": "政治",
+    "tech": "科技",
+    "opinion": "舆情",
+    "finance": "金融",
+    "culture": "文化",
+    "blackswan": "黑天鹅",
+    "unknown": "未知"
+  },
+  "agents": {
+    "Strategist": "政经谋士",
+    "Technomancer": "科技先知",
+    "Voxhunter": "舆情猎手",
+    "Sharktooth": "金融鲨鱼",
+    "Zeitgeist": "文化风向",
+    "Cassandra": "黑天鹅猎人"
+  },
+  "world": {
+    "earthquakes": "地震活动",
+    "climate": "气候异常",
+    "disruptions": "全球灾害",
+    "fearGreed": "恐惧与贪婪",
+    "conflicts": "武装冲突",
+    "polymarket": "预测市场",
+    "fires": "卫星火点",
+    "noData": "暂无数据",
+    "casualties": "伤亡",
+    "dataAttribution": "USGS · Open-Meteo · GDACS · ACLED · Polymarket · NASA FIRMS · GDELT · 30+ RSS"
+  },
+  "groups": {
+    "tech_worker": "科技从业者",
+    "finance_pro": "金融从业者",
+    "student": "学生群体",
+    "blue_collar": "蓝领工人",
+    "retiree": "退休人员",
+    "entrepreneur": "创业者",
+    "media_worker": "媒体人",
+    "govt_employee": "公务员",
+    "gig_worker": "自由职业",
+    "homemaker": "家庭主妇/夫"
+  },
+  "confidence": "置信度",
+  "wildcard": "黑天鹅",
+  "supporters": "支持者",
+  "dissenters": "反对者"
+}

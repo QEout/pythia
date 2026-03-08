@@ -10,8 +10,9 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import PREDICTION_INTERVAL_HOURS
@@ -79,8 +80,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Pythia", lifespan=lifespan)
 
 
+build_dir = Path(__file__).parent / "dashboard_build"
+if build_dir.exists():
+    app.mount("/assets", StaticFiles(directory=str(build_dir / "assets")), name="assets")
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
+    react_index = build_dir / "index.html"
+    if react_index.exists():
+        return HTMLResponse(react_index.read_text(encoding="utf-8"))
     html_path = Path(__file__).parent / "dashboard" / "index.html"
     return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
@@ -109,7 +118,22 @@ async def get_latest():
         return JSONResponse(latest_round)
     consensus = get_recent_consensus(1)
     if consensus:
-        return JSONResponse(consensus[0])
+        row = consensus[0]
+        preds = json.loads(row.get("predictions", "[]")) if isinstance(row.get("predictions"), str) else row.get("predictions", [])
+        sim = json.loads(row.get("sim_result", "{}") or "{}") if isinstance(row.get("sim_result"), str) else row.get("sim_result")
+        consensus_preds = [p for p in preds if not p.get("is_wildcard")]
+        wildcards = [p for p in preds if p.get("is_wildcard")] or [p for p in preds if p.get("source_agent")]
+        return JSONResponse({
+            "round_id": row.get("round_id", ""),
+            "ts": row.get("ts", ""),
+            "roundtable": {
+                "consensus_predictions": consensus_preds or preds,
+                "wildcards": wildcards,
+                "debate_summary": row.get("debate_log", ""),
+            },
+            "simulation": sim,
+            "chief_analyses": [],
+        })
     return JSONResponse({"message": "No predictions yet. Trigger one with POST /api/predict"})
 
 
@@ -182,6 +206,34 @@ async def get_cache_status():
     return JSONResponse(cache_stats())
 
 
+@app.post("/api/translate")
+async def translate_text(request: Request):
+    """On-demand translation of prediction text using LLM."""
+    from openai import OpenAI
+    from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+    body = await request.json()
+    text = body.get("text", "")
+    target = body.get("target_language", "中文")
+    if not text:
+        return JSONResponse({"translated": ""})
+    try:
+        client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+        resp = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=[
+                {"role": "system", "content": f"Translate the following text to {target}. Return ONLY the translation, nothing else."},
+                {"role": "user", "content": text},
+            ],
+            temperature=0.1,
+            max_tokens=500,
+        )
+        translated = resp.choices[0].message.content or text
+        return JSONResponse({"translated": translated.strip()})
+    except Exception as e:
+        log.warning("Translation failed: %s", e)
+        return JSONResponse({"translated": text})
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
@@ -200,4 +252,10 @@ async def websocket_endpoint(ws: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8080,
+        reload=True,
+        reload_excludes=["*.db", "*.db-wal", "*.db-shm", "*.sqlite"],
+    )
