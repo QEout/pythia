@@ -68,12 +68,16 @@ async def scheduled_verification():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from datetime import datetime, timedelta
     init_db()
     init_memory_tables()
     scheduler.add_job(scheduled_prediction, "interval", hours=PREDICTION_INTERVAL_HOURS, id="predict")
-    scheduler.add_job(scheduled_verification, "interval", hours=6, id="verify")
+    scheduler.add_job(
+        scheduled_verification, "interval", hours=6, id="verify",
+        next_run_time=datetime.now() + timedelta(minutes=2),
+    )
     scheduler.start()
-    log.info("天机 (Tianji) started. Prediction interval: %dh", PREDICTION_INTERVAL_HOURS)
+    log.info("天机 (Tianji) started. Prediction interval: %dh. Verification will run in 2 min then every 6h.", PREDICTION_INTERVAL_HOURS)
     yield
     scheduler.shutdown()
 
