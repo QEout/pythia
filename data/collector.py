@@ -98,6 +98,27 @@ class WorldSnapshot:
                 ("news", self.news), ("finance", self.finance),
                 ("fred", self.fred_indicators), ("climate", self.climate),
             ],
+            "military": [
+                ("news", self.news), ("conflicts", self.conflicts),
+                ("gdelt", self.gdelt), ("disruptions", self.disruptions),
+                ("fires", self.fires), ("predictions_market", self.predictions_market),
+            ],
+            "china": [
+                ("news", self.news), ("weibo", self.weibo),
+                ("trends", self.trends), ("finance", self.finance),
+                ("stocks", self.stock_quotes), ("gdelt", self.gdelt),
+                ("fred", self.fred_indicators),
+            ],
+            "crypto": [
+                ("crypto", self.crypto), ("finance", self.finance),
+                ("trends", self.trends), ("fear_greed", self.fear_greed),
+                ("predictions_market", self.predictions_market),
+            ],
+            "supply_chain": [
+                ("news", self.news), ("disruptions", self.disruptions),
+                ("finance", self.finance), ("fred", self.fred_indicators),
+                ("gdelt", self.gdelt), ("fires", self.fires),
+            ],
             "blackswan": [
                 ("news", self.news), ("earthquakes", self.earthquakes),
                 ("climate", self.climate), ("disruptions", self.disruptions),

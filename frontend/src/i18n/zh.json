@@ -16,7 +16,8 @@
   "tabs": {
     "dashboard": "仪表盘",
     "world": "全球情报",
-    "entities": "知识图谱"
+    "entities": "知识图谱",
+    "accuracy": "准确率"
   },
   "stats": {
     "agents": "智能体",
@@ -117,6 +118,51 @@
     "skeptic": "怀疑者",
     "contrarian": "反向操作者",
     "opinion_leader": "意见领袖"
+  },
+  "accuracy": {
+    "overallAccuracy": "总准确率",
+    "totalHits": "命中",
+    "totalMisses": "失误",
+    "pendingVerify": "待验证",
+    "verdictBreakdown": "验证结果分布",
+    "byAgent": "各智能体准确率",
+    "byDomain": "各领域准确率",
+    "trendByRound": "准确率趋势",
+    "recentVerified": "最近验证的预测",
+    "hit": "命中",
+    "partial": "部分命中",
+    "miss": "未命中",
+    "pending": "待验证",
+    "verified": "已验证",
+    "accuracy": "准确率",
+    "totalPreds": "总预测数",
+    "status": "状态",
+    "agent": "智能体",
+    "prediction": "预测内容",
+    "domain": "领域",
+    "conf": "置信度",
+    "note": "备注",
+    "time": "时间",
+    "noData": "暂无已验证的预测",
+    "noDataHint": "预测验证每12小时运行一次，运行预测后准确率数据将在此显示。"
+  },
+  "sim": {
+    "sentimentIndex": "群体情绪",
+    "reachPct": "传播覆盖 %",
+    "sentimentLine": "情绪指数",
+    "polarizationLine": "极化指数",
+    "propagationProcess": "传播过程",
+    "spreaders": "传播者",
+    "newActivated": "新增激活",
+    "contrarianActivated": "反向激活",
+    "mcIndicators": "蒙特卡洛传播指标",
+    "avgTrust": "平均信任 %",
+    "incomingBelief": "输入信念 %",
+    "counterNarrative": "反叙事强度"
+  },
+  "prediction": {
+    "evidence": "数据支撑",
+    "risks": "风险因素"
   },
   "confidence": "置信度",
   "wildcard": "黑天鹅",

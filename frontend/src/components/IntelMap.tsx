@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
 import { useTranslation } from 'react-i18next'
 import 'leaflet/dist/leaflet.css'
+import { toLocalTime } from '../utils/time'
 
 interface Props {
   data: any
@@ -126,7 +127,7 @@ export default function IntelMap({ data }: Props) {
               <div className="text-xs max-w-[200px]">
                 <strong>M{(q.magnitude ?? 0).toFixed(1)}</strong>
                 <div>{q.title ?? q.location ?? ''}</div>
-                {q.time && <div className="text-gray-500">{q.time}</div>}
+                {q.time && <div className="text-gray-500">{toLocalTime(q.time)}</div>}
               </div>
             </Popup>
           </CircleMarker>

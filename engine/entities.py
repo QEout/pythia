@@ -43,12 +43,74 @@ KNOWN_ENTITIES: dict[str, str] = {
     "earthquake": "event_type", "hurricane": "event_type",
     "wildfire": "event_type", "flood": "event_type",
     "pandemic": "event_type", "cyberattack": "event_type",
+    "Canada": "country", "Mexico": "country", "Brazil": "country", "Argentina": "country",
+    "Turkey": "country", "Syria": "country", "Lebanon": "country", "Yemen": "country",
+    "Egypt": "country", "Qatar": "country", "UAE": "country", "United Arab Emirates": "country",
+    "Pakistan": "country", "Indonesia": "country", "Philippines": "country", "Vietnam": "country",
+    "Australia": "country", "Nigeria": "country", "South Africa": "country", "Poland": "country",
+    "Italy": "country", "Spain": "country", "Netherlands": "country", "Taiwan Strait": "topic",
+    "South China Sea": "topic", "Red Sea": "topic", "Gaza": "topic", "West Bank": "topic",
+    "European Union": "organization", "ECB": "organization", "PBOC": "organization",
+    "Bank of Japan": "organization", "World Bank": "organization", "WTO": "organization",
+    "ASEAN": "organization", "African Union": "organization", "ECOWAS": "organization",
+    "Hamas": "organization", "Hezbollah": "organization", "Houthis": "organization",
+    "TSMC": "company", "Samsung": "company", "Intel": "company", "AMD": "company",
+    "ASML": "company", "Alibaba": "company", "Tencent": "company", "TSLA": "company",
+    "AAPL": "company", "MSFT": "company", "GOOGL": "company", "AMZN": "company", "NVDA": "company",
+    "Netanyahu": "person", "Modi": "person", "Erdogan": "person", "Macron": "person",
+    "Scholz": "person", "Zelenskyy": "person", "Starmer": "person", "von der Leyen": "person",
+    "oil": "topic", "gas": "topic", "semiconductor": "topic", "AI chip": "topic",
+    "drone": "topic", "missile": "topic", "ceasefire": "topic", "tariffs": "topic",
 }
 
 _ENTITY_PATTERN = re.compile(
     r'\b(' + '|'.join(re.escape(k) for k in sorted(KNOWN_ENTITIES.keys(), key=len, reverse=True)) + r')\b',
     re.IGNORECASE,
 )
+_KNOWN_ENTITY_LOWER = {k.lower() for k in KNOWN_ENTITIES.keys()}
+
+_PROPER_NOUN_PATTERN = re.compile(
+    r'\b(?:[A-Z][a-z]+|[A-Z]{2,})(?:\s+(?:[A-Z][a-z]+|[A-Z]{2,})){0,2}\b'
+)
+
+_STOP_ENTITIES = {
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+    "January", "February", "March", "April", "May", "June", "July", "August",
+    "September", "October", "November", "December", "Reuters", "Bloomberg",
+    "Breaking News", "Latest News", "World News", "News", "Top News",
+}
+
+
+def _guess_entity_type(name: str) -> str:
+    if name in KNOWN_ENTITIES:
+        return KNOWN_ENTITIES[name]
+    if any(token in name for token in ["Inc", "Corp", "Ltd", "Group", "Bank", "Energy", "AI", "Technologies"]):
+        return "company"
+    if name.isupper() and 2 <= len(name) <= 6:
+        return "organization"
+    parts = name.split()
+    if len(parts) >= 2 and all(p[:1].isupper() for p in parts if p):
+        return "person"
+    return "topic"
+
+
+def _extract_heuristic_entities(text: str) -> list[tuple[str, str]]:
+    results: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for candidate in _PROPER_NOUN_PATTERN.findall(text):
+        candidate = candidate.strip(" .,;:!?()[]{}\"'")
+        if not candidate or candidate in _STOP_ENTITIES:
+            continue
+        if candidate.lower() in _KNOWN_ENTITY_LOWER:
+            continue
+        # single title-cased words are often noisy; keep acronyms and multi-word names
+        if " " not in candidate and not candidate.isupper():
+            continue
+        if len(candidate) < 3 or candidate in seen:
+            continue
+        seen.add(candidate)
+        results.append((candidate, _guess_entity_type(candidate)))
+    return results
 
 
 def extract_entities_fast(items: list[dict]) -> dict[str, int]:
@@ -58,16 +120,36 @@ def extract_entities_fast(items: list[dict]) -> dict[str, int]:
     """
     counts: dict[str, int] = {}
     for item in items:
-        text = f"{item.get('title', '')} {item.get('snippet', '')} {item.get('notes', '')}"
+        title = item.get('title', '') or ''
+        text = f"{title} {item.get('snippet', '')} {item.get('notes', '')}"
+        item_entities: list[tuple[str, str]] = []
+        seen_in_item: set[str] = set()
+
         for match in _ENTITY_PATTERN.finditer(text):
             raw = match.group(0)
             canonical = _canonicalize(raw)
+            if canonical not in seen_in_item:
+                item_entities.append((canonical, KNOWN_ENTITIES.get(canonical, "unknown")))
+                seen_in_item.add(canonical)
             counts[canonical] = counts.get(canonical, 0) + 1
 
-    for entity, count in counts.items():
-        etype = KNOWN_ENTITIES.get(entity, "unknown")
-        for _ in range(count):
-            upsert_entity(entity, etype, context=f"Mentioned {count}x in latest data cycle")
+        # Heuristic expansion for proper nouns not in the static dictionary
+        for entity, etype in _extract_heuristic_entities(title):
+            if entity not in seen_in_item:
+                item_entities.append((entity, etype))
+                seen_in_item.add(entity)
+            counts[entity] = counts.get(entity, 0) + 1
+
+        # Persist each entity with the actual headline context and co-mentioned entities.
+        relation_names = [name for name, _ in item_entities]
+        for entity, etype in item_entities:
+            related = [name for name in relation_names if name != entity][:12]
+            upsert_entity(
+                entity,
+                etype,
+                context=f"[headline] {title[:180]}",
+                relations=related,
+            )
 
     return counts
 

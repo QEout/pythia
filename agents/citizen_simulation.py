@@ -148,6 +148,10 @@ def simulate_prediction_spread(
 
     history = []
     archetype_history = []
+    process_history = []
+
+    blended_sensitivity = np.zeros(n, dtype=np.float32)
+    pred_count = max(len(predictions), 1)
 
     for pred in predictions:
         domain = pred.get("domain", "opinion")
@@ -156,23 +160,26 @@ def simulate_prediction_spread(
         di = DOMAIN_INDEX.get(domain, 3)
 
         domain_sensitivity = world.sensitivity[:, di]
+        blended_sensitivity += domain_sensitivity / pred_count
         polarity = (confidence - 0.5) * 2
         if is_wildcard:
             polarity *= 1.5
 
-        initial_seed = max(int(n * 0.001), 100)
+        initial_seed = max(int(n * 0.005), 500)
         seed_weights = domain_sensitivity.copy()
         seed_weights /= seed_weights.sum()
         seed_idx = rng.choice(n, size=initial_seed, replace=False, p=seed_weights)
 
         world.activated[seed_idx] = True
-        world.belief_strength[seed_idx] += confidence * domain_sensitivity[seed_idx]
+        world.belief_strength[seed_idx] += (0.3 + confidence) * domain_sensitivity[seed_idx]
         world.opinion[seed_idx] += polarity * domain_sensitivity[seed_idx]
         world.exposure_count[seed_idx] += 1
 
     counter_narrative_strength = 0.0
 
     for step in range(steps):
+        world.belief_strength *= 0.985
+
         active_idx = np.where(world.activated)[0]
         if len(active_idx) == 0:
             break
@@ -180,6 +187,18 @@ def simulate_prediction_spread(
         spreaders_mask = rng.random(len(active_idx)) < world.spread_prob[active_idx]
         spreaders = active_idx[spreaders_mask]
         if len(spreaders) == 0:
+            process_history.append({
+                "step": step,
+                "active_agents": int(len(active_idx)),
+                "spreaders": 0,
+                "potential_reach": 0,
+                "contacts": 0,
+                "new_activated": 0,
+                "contrarian_activated": 0,
+                "trust_mean": 0.0,
+                "incoming_belief_mean": 0.0,
+                "counter_narrative": round(counter_narrative_strength, 4),
+            })
             continue
 
         spreader_groups = world.groups[spreaders]
@@ -190,9 +209,21 @@ def simulate_prediction_spread(
         if len(inactive_idx) == 0:
             break
 
-        contact_rate = 0.1 + 0.02 * step
+        contact_rate = 0.10 + 0.25 / (1 + np.exp(-(step - steps / 3) / 3))
         n_contacts = min(int(potential_new * contact_rate), len(inactive_idx))
         if n_contacts <= 0:
+            process_history.append({
+                "step": step,
+                "active_agents": int(len(active_idx)),
+                "spreaders": int(len(spreaders)),
+                "potential_reach": int(potential_new),
+                "contacts": 0,
+                "new_activated": 0,
+                "contrarian_activated": 0,
+                "trust_mean": 0.0,
+                "incoming_belief_mean": 0.0,
+                "counter_narrative": round(counter_narrative_strength, 4),
+            })
             break
 
         contact_idx = rng.choice(inactive_idx, size=n_contacts, replace=False)
@@ -210,32 +241,41 @@ def simulate_prediction_spread(
         avg_spreader_belief = world.belief_strength[spreaders].mean()
         avg_spreader_opinion = world.opinion[spreaders].mean()
 
-        exposure_factor = np.minimum(world.exposure_count[contact_idx].astype(np.float32) / 3.0, 1.0)
-        incoming_belief = avg_spreader_belief * trust_boost * exposure_factor
+        exposure_factor = np.minimum(world.exposure_count[contact_idx].astype(np.float32) / 2.0, 1.0)
+        contact_sensitivity = blended_sensitivity[contact_idx]
+        incoming_belief = (avg_spreader_belief * trust_boost + contact_sensitivity * 0.3) * exposure_factor
 
         skepticism_threshold = world.skepticism[contact_idx]
         convinced = incoming_belief > skepticism_threshold
 
         contrarian_mask = world.archetypes[contact_idx] == 3
-        contrarian_convinced = contrarian_mask & (rng.random(n_contacts) < 0.3)
+        contrarian_exposed_enough = world.exposure_count[contact_idx] >= 3
+        contrarian_convinced = contrarian_mask & contrarian_exposed_enough & (rng.random(n_contacts) < 0.06)
         convinced = convinced | contrarian_convinced
 
         new_activated = contact_idx[convinced]
+        contrarian_new_count = 0
         if len(new_activated) > 0:
             world.activated[new_activated] = True
 
-            normal_new = new_activated[~world.archetypes[new_activated].astype(bool) | (world.archetypes[new_activated] != 3)]
+            normal_mask = world.archetypes[new_activated] != 3
+            normal_new = new_activated[normal_mask]
             contrarian_new = new_activated[world.archetypes[new_activated] == 3]
+            contrarian_new_count = int(len(contrarian_new))
 
             if len(normal_new) > 0:
                 noise = rng.normal(0, 0.08, size=len(normal_new)).astype(np.float32)
-                world.belief_strength[normal_new] = incoming_belief[convinced][~world.archetypes[new_activated].astype(bool) | (world.archetypes[new_activated] != 3)][:len(normal_new)] if len(normal_new) > 0 else 0
+                convinced_belief = incoming_belief[convinced]
+                world.belief_strength[normal_new] = convinced_belief[normal_mask][:len(normal_new)]
                 world.opinion[normal_new] = avg_spreader_opinion * 0.7 + noise
 
             if len(contrarian_new) > 0:
                 world.belief_strength[contrarian_new] = 0.5
                 world.opinion[contrarian_new] = -avg_spreader_opinion * 0.8 + rng.normal(0, 0.1, size=len(contrarian_new)).astype(np.float32)
-                counter_narrative_strength += len(contrarian_new) / n * 10
+                counter_narrative_strength = min(
+                    counter_narrative_strength + len(contrarian_new) / n * 5,
+                    1.0,
+                )
 
         total_activated = int(world.activated.sum())
         active_opinion = world.opinion[world.activated]
@@ -248,6 +288,18 @@ def simulate_prediction_spread(
             "activation_pct": round(total_activated / n * 100, 2),
             "avg_sentiment": round(avg_sent, 4),
             "polarization": round(opinion_std, 4),
+            "counter_narrative": round(counter_narrative_strength, 4),
+        })
+        process_history.append({
+            "step": step,
+            "active_agents": int(len(active_idx)),
+            "spreaders": int(len(spreaders)),
+            "potential_reach": int(potential_new),
+            "contacts": int(n_contacts),
+            "new_activated": int(len(new_activated)),
+            "contrarian_activated": contrarian_new_count,
+            "trust_mean": round(float(trust_boost.mean()) if len(trust_boost) > 0 else 0, 4),
+            "incoming_belief_mean": round(float(incoming_belief.mean()) if len(incoming_belief) > 0 else 0, 4),
             "counter_narrative": round(counter_narrative_strength, 4),
         })
 
@@ -297,6 +349,7 @@ def simulate_prediction_spread(
         "polarization_index": round(float(active_opinions.std()), 4) if world.activated.sum() > 1 else 0,
         "counter_narrative_strength": round(counter_narrative_strength, 4),
         "spread_history": history,
+        "process_history": process_history,
         "group_breakdown": group_results,
         "archetype_breakdown": archetype_results,
     }

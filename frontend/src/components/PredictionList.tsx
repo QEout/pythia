@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
-import { Languages, ArrowRight, AlertTriangle, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Languages, ArrowRight, AlertTriangle, ThumbsUp, ThumbsDown, Database, ShieldAlert } from 'lucide-react'
 
 interface Props {
   predictions: any[]
@@ -136,15 +136,39 @@ export default function PredictionList({ predictions, type }: Props) {
                   )}
 
                   {isExpanded && (
-                    <div className="mt-3 pt-3 border-t border-border space-y-2 animate-fade-in">
+                    <div className="mt-3 pt-3 border-t border-border space-y-3 animate-fade-in">
                       {p.reasoning && (
-                        <div className="text-[11px] text-zinc-500 leading-relaxed flex items-start gap-2">
-                          <ArrowRight size={11} className="mt-0.5 text-zinc-600 shrink-0" />
-                          {p.reasoning}
+                        <div className="text-[11px] text-zinc-400 leading-relaxed flex items-start gap-2">
+                          <ArrowRight size={11} className="mt-0.5 text-cyan-600 shrink-0" />
+                          <span>{p.reasoning}</span>
                         </div>
                       )}
 
-                      <div className="flex items-center gap-4 text-[10px]">
+                      {p.evidence?.length > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-semibold uppercase">
+                            <Database size={10} className="text-emerald-600" />
+                            {t('prediction.evidence', 'Data Evidence')}
+                          </div>
+                          <div className="pl-4 space-y-0.5">
+                            {p.evidence.map((ev: string, ei: number) => (
+                              <div key={ei} className="flex items-start gap-1.5 text-[10px] text-zinc-500 leading-relaxed">
+                                <span className="w-1 h-1 rounded-full bg-emerald-500/60 mt-1.5 shrink-0" />
+                                {ev}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {p.risks && (
+                        <div className="flex items-start gap-1.5 text-[10px] text-amber-500/70 leading-relaxed">
+                          <ShieldAlert size={10} className="mt-0.5 shrink-0" />
+                          <span>{p.risks}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-4 text-[10px] pt-1">
                         {p.supporters?.length > 0 && (
                           <span className="flex items-center gap-1 text-emerald-400/70">
                             <ThumbsUp size={10} />

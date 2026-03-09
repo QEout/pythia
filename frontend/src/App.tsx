@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useApi } from './hooks/useApi'
+import { toLocalTime } from './utils/time'
 import Header from './components/Header'
 import Ticker from './components/Ticker'
 import StatsBar from './components/StatsBar'
@@ -13,6 +14,7 @@ import WorldPulse from './components/WorldPulse'
 import EntityGraph from './components/EntityGraph'
 import SourceHealth from './components/SourceHealth'
 import StreamingProgress from './components/StreamingProgress'
+import AccuracyDashboard from './components/AccuracyDashboard'
 
 interface PredictionRound {
   round_id: string
@@ -168,7 +170,7 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         sourceCount={round?.source_count ?? 13}
-        lastRoundTime={round?.round_id?.slice(2, 15)}
+        lastRoundTime={round?.ts ? toLocalTime(round.ts) : undefined}
       />
 
       <Ticker worldData={worldApi.data} />
@@ -235,6 +237,13 @@ export default function App() {
         {activeTab === 'entities' && (
           <div className="animate-fade-in">
             <EntityGraph entities={round?.top_entities} />
+          </div>
+        )}
+
+        {/* Accuracy Tab */}
+        {activeTab === 'accuracy' && (
+          <div className="animate-fade-in">
+            <AccuracyDashboard />
           </div>
         )}
       </main>

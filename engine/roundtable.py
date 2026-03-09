@@ -14,7 +14,7 @@ client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 
 ROUNDTABLE_SYSTEM = """You are the Moderator of 天机 (Tianji)'s Roundtable — a debate among 12 AI agents predicting the future.
 
-You have received analysis and predictions from 6 specialist agents. Your job:
+You have received analysis and predictions from 12 specialist agents. Your job:
 
 1. SYNTHESIZE: Identify where agents agree and disagree
 2. DEBATE: For each major disagreement, present both sides fairly
@@ -22,9 +22,15 @@ You have received analysis and predictions from 6 specialist agents. Your job:
 4. HIGHLIGHT: Mark any prediction where a lone dissenter (especially Cassandra) contradicts the majority — these are "wildcard" predictions
 
 For each final prediction, calculate a consensus confidence:
-  - If 5-6 agents agree: confidence × 1.2 (cap at 0.95)
-  - If 3-4 agents agree: keep original confidence
+  - If 10-12 agents agree: confidence × 1.2 (cap at 0.95)
+  - If 6-9 agents agree: keep original confidence
+  - If 3-5 agents support: confidence × 0.8
   - If only 1-2 agents support: confidence × 0.6 (wildcard)
+
+IMPORTANT: For each prediction, provide rich reasoning that explains:
+  1. WHY agents reached this conclusion (the logical chain)
+  2. WHAT specific data signals or events support it (cite concrete facts, numbers, or trends from the agents' analyses)
+  3. WHAT could invalidate this prediction (key risks or assumptions)
 
 Output STRICT JSON:
 {
@@ -36,8 +42,11 @@ Output STRICT JSON:
       "supporters": ["Agent1", "Agent2"],
       "dissenters": ["Agent3"],
       "domain": "finance",
+      "time_horizon_hours": 6,
       "is_wildcard": false,
-      "reasoning": "why the consensus formed"
+      "reasoning": "why the consensus formed — the logical chain",
+      "evidence": ["specific data point or signal 1", "specific data point or signal 2", "specific data point or signal 3"],
+      "risks": "what could invalidate this prediction"
     }
   ],
   "wildcards": [
@@ -46,7 +55,10 @@ Output STRICT JSON:
       "confidence": 0.25,
       "source_agent": "Cassandra",
       "domain": "blackswan",
-      "reasoning": "why this might matter despite low consensus"
+      "time_horizon_hours": 12,
+      "reasoning": "why this might matter despite low consensus",
+      "evidence": ["specific signal that triggered this wildcard"],
+      "risks": "why the majority dismissed this"
     }
   ]
 }"""
@@ -72,10 +84,10 @@ async def run_roundtable(chief_results: list[tuple[ChiefAgent, dict]]) -> dict:
             model=DEEPSEEK_MODEL,
             messages=[
                 {"role": "system", "content": ROUNDTABLE_SYSTEM},
-                {"role": "user", "content": f"Here are the 6 agents' analyses and predictions:\n\n{all_briefs}\n\nConduct the roundtable debate and produce consensus. Output JSON only."},
+                {"role": "user", "content": f"Here are the 12 agents' analyses and predictions:\n\n{all_briefs}\n\nConduct the roundtable debate and produce consensus. Output JSON only."},
             ],
             temperature=0.5,
-            max_tokens=2000,
+            max_tokens=4000,
             response_format={"type": "json_object"},
         )
         text = resp.choices[0].message.content or "{}"

@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
     init_db()
     init_memory_tables()
     scheduler.add_job(scheduled_prediction, "interval", hours=PREDICTION_INTERVAL_HOURS, id="predict")
-    scheduler.add_job(scheduled_verification, "interval", hours=12, id="verify")
+    scheduler.add_job(scheduled_verification, "interval", hours=6, id="verify")
     scheduler.start()
     log.info("天机 (Tianji) started. Prediction interval: %dh", PREDICTION_INTERVAL_HOURS)
     yield
@@ -182,6 +182,7 @@ async def get_history():
 @app.get("/api/world")
 async def get_world_data():
     """Fetch all intelligence data for the World Intel tab (16 sources)."""
+    from config import FRED_API_KEY, FINNHUB_API_KEY
     from data.sources.worldmonitor import fetch_all_worldmonitor
     from data.sources.acled import fetch_acled_conflicts
     from data.sources.polymarket import fetch_polymarket
@@ -190,9 +191,15 @@ async def get_world_data():
     from data.sources.who import fetch_who_alerts
     from data.sources.finnhub import fetch_stock_quotes
     from data.sources.news import fetch_news
+    from data.sources.weibo import fetch_weibo_hot
+    from data.sources.trends import fetch_google_trends
+    from data.sources.crypto import fetch_crypto
+    from data.sources.finance import fetch_finance
+    from data.sources.gdelt import fetch_gdelt_trending
     from data.cache import cached_fetch, TTL_SHORT, TTL_LONG, TTL_MEDIUM, TTL_EXTENDED
     try:
-        wm, conflicts, markets, fires, fred, who, stocks, news_items = await asyncio.gather(
+        (wm, conflicts, markets, fires, fred, who, stocks, news_items,
+         weibo, trends, crypto, finance, gdelt) = await asyncio.gather(
             cached_fetch("worldmonitor", fetch_all_worldmonitor, TTL_LONG),
             cached_fetch("acled", fetch_acled_conflicts, TTL_EXTENDED),
             cached_fetch("polymarket", fetch_polymarket, TTL_MEDIUM),
@@ -201,6 +208,11 @@ async def get_world_data():
             cached_fetch("who", fetch_who_alerts, TTL_LONG),
             cached_fetch("finnhub", fetch_stock_quotes, TTL_SHORT),
             cached_fetch("news", fetch_news, TTL_MEDIUM),
+            cached_fetch("weibo", fetch_weibo_hot, TTL_MEDIUM),
+            cached_fetch("trends", fetch_google_trends, TTL_MEDIUM),
+            cached_fetch("crypto", fetch_crypto, TTL_SHORT),
+            cached_fetch("finance", fetch_finance, TTL_SHORT),
+            cached_fetch("gdelt", fetch_gdelt_trending, TTL_LONG),
             return_exceptions=True,
         )
         result = wm if isinstance(wm, dict) else {"earthquakes": [], "climate": [], "disruptions": [], "markets": []}
@@ -211,6 +223,15 @@ async def get_world_data():
         result["who"] = who if isinstance(who, list) else []
         result["stocks"] = stocks if isinstance(stocks, list) else []
         result["news_headlines"] = (news_items if isinstance(news_items, list) else [])[:50]
+        result["weibo"] = weibo if isinstance(weibo, list) else []
+        result["trends"] = trends if isinstance(trends, list) else []
+        result["crypto"] = crypto if isinstance(crypto, list) else []
+        result["finance"] = finance if isinstance(finance, list) else []
+        result["gdelt"] = gdelt if isinstance(gdelt, list) else []
+        result["meta"] = {
+            "fred_configured": bool(FRED_API_KEY),
+            "finnhub_configured": bool(FINNHUB_API_KEY),
+        }
         return JSONResponse(result)
     except Exception as e:
         log.error("World data fetch failed: %s", e)
@@ -218,7 +239,106 @@ async def get_world_data():
             "earthquakes": [], "climate": [], "disruptions": [], "markets": [],
             "conflicts": [], "prediction_markets": [], "fires": [],
             "fred": [], "who": [], "stocks": [], "news_headlines": [],
+            "weibo": [], "trends": [], "crypto": [], "finance": [], "gdelt": [],
+            "meta": {"fred_configured": bool(FRED_API_KEY), "finnhub_configured": bool(FINNHUB_API_KEY)},
         })
+
+
+def _normalize_source_items(source_key: str, payload) -> list[dict]:
+    """Normalize heterogeneous source payloads into a simple list for UI detail drawers."""
+    if payload is None:
+        return []
+
+    if source_key == "worldmonitor" and isinstance(payload, dict):
+        items: list[dict] = []
+        section_map = {
+            "earthquakes": "earthquake",
+            "climate": "climate",
+            "disruptions": "disruption",
+            "markets": "market",
+        }
+        for section, section_items in payload.items():
+            if not isinstance(section_items, list):
+                continue
+            for item in section_items:
+                if not isinstance(item, dict):
+                    continue
+                items.append({
+                    "title": item.get("title") or item.get("name") or section,
+                    "subtitle": item.get("location") or item.get("region") or item.get("country") or item.get("classification") or "",
+                    "url": item.get("url") or item.get("link") or "",
+                    "category": section_map.get(section, section),
+                    "raw": item,
+                })
+        return items
+
+    if isinstance(payload, list):
+        items = []
+        for item in payload:
+            if not isinstance(item, dict):
+                items.append({"title": str(item), "subtitle": "", "url": "", "category": source_key, "raw": item})
+                continue
+            items.append({
+                "title": item.get("title") or item.get("name") or item.get("query") or item.get("word") or item.get("symbol") or source_key,
+                "subtitle": item.get("snippet") or item.get("source") or item.get("label") or item.get("date") or item.get("country") or "",
+                "url": item.get("url") or item.get("link") or "",
+                "category": item.get("category") or source_key,
+                "raw": item,
+            })
+        return items
+
+    return [{"title": source_key, "subtitle": "", "url": "", "category": source_key, "raw": payload}]
+
+
+@app.get("/api/source/{source_key}")
+async def get_source_detail(source_key: str):
+    """Return normalized source payload so the UI can inspect raw values and links."""
+    from data.cache import cached_fetch, TTL_SHORT, TTL_LONG, TTL_MEDIUM, TTL_EXTENDED
+    from data.sources.news import fetch_news
+    from data.sources.weibo import fetch_weibo_hot
+    from data.sources.trends import fetch_google_trends
+    from data.sources.crypto import fetch_crypto
+    from data.sources.finance import fetch_finance
+    from data.sources.worldmonitor import fetch_all_worldmonitor
+    from data.sources.acled import fetch_acled_conflicts
+    from data.sources.gdelt import fetch_gdelt_trending
+    from data.sources.polymarket import fetch_polymarket
+    from data.sources.nasa_firms import fetch_active_fires
+    from data.sources.fred import fetch_fred_indicators
+    from data.sources.who import fetch_who_alerts
+    from data.sources.finnhub import fetch_stock_quotes
+
+    source_map = {
+        "news": (fetch_news, TTL_MEDIUM),
+        "weibo": (fetch_weibo_hot, TTL_MEDIUM),
+        "trends": (fetch_google_trends, TTL_MEDIUM),
+        "crypto": (fetch_crypto, TTL_SHORT),
+        "finance": (fetch_finance, TTL_SHORT),
+        "worldmonitor": (fetch_all_worldmonitor, TTL_LONG),
+        "acled": (fetch_acled_conflicts, TTL_EXTENDED),
+        "gdelt": (fetch_gdelt_trending, TTL_LONG),
+        "polymarket": (fetch_polymarket, TTL_MEDIUM),
+        "fires": (fetch_active_fires, TTL_LONG),
+        "fred": (fetch_fred_indicators, TTL_LONG),
+        "who": (fetch_who_alerts, TTL_LONG),
+        "finnhub": (fetch_stock_quotes, TTL_SHORT),
+    }
+
+    if source_key not in source_map:
+        return JSONResponse({"error": "Unknown source"}, status_code=404)
+
+    fetcher, ttl = source_map[source_key]
+    try:
+        payload = await cached_fetch(source_key, fetcher, ttl)
+        items = _normalize_source_items(source_key, payload)
+        return JSONResponse({
+            "source": source_key,
+            "count": len(items),
+            "items": items[:100],
+        })
+    except Exception as e:
+        log.warning("Source detail fetch failed for %s: %s", source_key, e)
+        return JSONResponse({"source": source_key, "count": 0, "items": [], "error": str(e)})
 
 
 @app.get("/api/agents")
@@ -332,7 +452,7 @@ async def get_agent_detail(agent_name: str):
 @app.get("/api/entities")
 async def get_entities():
     """Get trending entities from the knowledge graph with full context."""
-    entities = get_trending_entities(30)
+    entities = get_trending_entities(80)
     return JSONResponse(entities)
 
 
@@ -420,6 +540,66 @@ async def get_entity_detail(entity_name: str):
         "related_entities": related_entities + [dict(r) for r in co_occurring if dict(r)["entity"] != entity_name],
         "related_predictions": [dict(r) for r in related_preds],
         "agent_mentions": [dict(r) for r in agent_mentions],
+    })
+
+
+@app.get("/api/accuracy")
+async def get_accuracy_dashboard():
+    """Historical prediction accuracy — the core value metric of Tianji."""
+    from db.store import get_conn
+    conn = get_conn()
+
+    total = conn.execute("SELECT COUNT(*) FROM predictions WHERE verified IS NOT NULL").fetchone()[0]
+    hits = conn.execute("SELECT COUNT(*) FROM predictions WHERE verified = 1").fetchone()[0]
+    misses = conn.execute("SELECT COUNT(*) FROM predictions WHERE verified = 0").fetchone()[0]
+    pending = conn.execute("SELECT COUNT(*) FROM predictions WHERE verified IS NULL").fetchone()[0]
+
+    by_agent = [dict(r) for r in conn.execute("""
+        SELECT agent_name,
+               COUNT(*) as total,
+               SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END) as hits,
+               SUM(CASE WHEN verified = 0 THEN 1 ELSE 0 END) as misses,
+               ROUND(CAST(SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END) AS REAL) / MAX(COUNT(*), 1) * 100, 1) as accuracy
+        FROM predictions WHERE verified IS NOT NULL
+        GROUP BY agent_name ORDER BY accuracy DESC
+    """).fetchall()]
+
+    by_domain = [dict(r) for r in conn.execute("""
+        SELECT domain,
+               COUNT(*) as total,
+               SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END) as hits,
+               ROUND(CAST(SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END) AS REAL) / MAX(COUNT(*), 1) * 100, 1) as accuracy
+        FROM predictions WHERE verified IS NOT NULL
+        GROUP BY domain ORDER BY accuracy DESC
+    """).fetchall()]
+
+    recent_verified = [dict(r) for r in conn.execute("""
+        SELECT prediction, agent_name, domain, confidence, verified, verify_note, ts, verified_at
+        FROM predictions WHERE verified IS NOT NULL
+        ORDER BY verified_at DESC LIMIT 30
+    """).fetchall()]
+
+    by_round = [dict(r) for r in conn.execute("""
+        SELECT round_id,
+               COUNT(*) as total,
+               SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END) as hits,
+               ROUND(CAST(SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END) AS REAL) / MAX(COUNT(*), 1) * 100, 1) as accuracy,
+               MIN(ts) as ts
+        FROM predictions WHERE verified IS NOT NULL
+        GROUP BY round_id ORDER BY ts DESC LIMIT 20
+    """).fetchall()]
+
+    conn.close()
+    return JSONResponse({
+        "total_verified": total,
+        "hits": hits,
+        "misses": misses,
+        "pending": pending,
+        "overall_accuracy": round(hits / max(total, 1) * 100, 1),
+        "by_agent": by_agent,
+        "by_domain": by_domain,
+        "by_round": by_round,
+        "recent_verified": recent_verified,
     })
 
 

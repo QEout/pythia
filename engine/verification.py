@@ -32,13 +32,13 @@ Output STRICT JSON:
   "verdict": "hit" | "partial" | "miss",
   "explanation": "1-2 sentence explanation of why this is a hit/partial/miss",
   "evidence": "specific data point from current data that supports your verdict",
-  "lesson": "1 sentence about what the agent should learn from this outcome for future predictions"
+  "lesson": "A concrete, actionable lesson. Include: (1) WHAT signal the agent relied on that was right/wrong, (2) WHY it was misleading or reliable, (3) HOW the agent should adjust its reasoning pattern next time. Example: 'Relied on Weibo trending volume as proxy for policy shift, but trending topics often reflect media hype rather than actual policy signals. Next time, cross-reference with official Xinhua/CCTV statements before concluding a policy direction change.'"
 }"""
 
 
 async def verify_predictions():
-    """Check predictions older than 12h that haven't been verified yet."""
-    cutoff = (datetime.utcnow() - timedelta(hours=12)).isoformat()
+    """Check predictions older than 6h that haven't been verified yet."""
+    cutoff = (datetime.utcnow() - timedelta(hours=6)).isoformat()
     unverified = get_unverified_predictions(before=cutoff)
 
     if not unverified:
@@ -57,7 +57,7 @@ async def verify_predictions():
                 model=DEEPSEEK_MODEL,
                 messages=[
                     {"role": "system", "content": VERIFY_SYSTEM},
-                    {"role": "user", "content": f"PREDICTION (made at {pred['ts']}):\n{pred['prediction']}\n\nCURRENT WORLD DATA:\n{current_data}\n\nVerify. Output JSON only."},
+                    {"role": "user", "content": f"PREDICTION (made at {pred['ts']}, domain: {pred.get('domain','unknown')}):\n{pred['prediction']}\n\nCURRENT WORLD DATA:\n{current_data}\n\nThis prediction was for the next 6-12 hours from when it was made. Verify whether it came true. Output JSON only."},
                 ],
                 temperature=0.2,
                 max_tokens=400,

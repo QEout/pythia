@@ -1,7 +1,13 @@
-"""Yahoo Finance — major indices and movers."""
+"""Yahoo Finance — major indices and movers.
+
+yfinance is synchronous, so we run it in a thread executor to avoid
+blocking the event loop during concurrent data collection.
+"""
 
 from __future__ import annotations
+import asyncio
 import logging
+import math
 
 log = logging.getLogger(__name__)
 
@@ -13,7 +19,7 @@ TICKER_NAMES = {
 }
 
 
-async def fetch_finance() -> list[dict]:
+def _sync_fetch() -> list[dict]:
     items: list[dict] = []
     try:
         import yfinance as yf
@@ -25,7 +31,9 @@ async def fetch_finance() -> list[dict]:
                     continue
                 last = float(df["Close"].iloc[-1])
                 prev = float(df["Close"].iloc[-2])
-                change = (last - prev) / prev * 100 if prev else 0
+                if math.isnan(last) or math.isnan(prev) or prev == 0:
+                    continue
+                change = (last - prev) / prev * 100
                 items.append({
                     "name": TICKER_NAMES.get(ticker, ticker),
                     "symbol": ticker,
@@ -37,3 +45,8 @@ async def fetch_finance() -> list[dict]:
     except Exception as e:
         log.warning("Yahoo Finance failed: %s", e)
     return items
+
+
+async def fetch_finance() -> list[dict]:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _sync_fetch)

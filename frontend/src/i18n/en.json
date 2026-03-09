@@ -16,7 +16,8 @@
   "tabs": {
     "dashboard": "Dashboard",
     "world": "World Intel",
-    "entities": "Knowledge Graph"
+    "entities": "Knowledge Graph",
+    "accuracy": "Accuracy"
   },
   "stats": {
     "agents": "Agents",
@@ -117,6 +118,51 @@
     "skeptic": "Skeptics",
     "contrarian": "Contrarians",
     "opinion_leader": "Opinion Leaders"
+  },
+  "accuracy": {
+    "overallAccuracy": "Overall Accuracy",
+    "totalHits": "Hits",
+    "totalMisses": "Misses",
+    "pendingVerify": "Pending Verify",
+    "verdictBreakdown": "Verdict Breakdown",
+    "byAgent": "Accuracy by Agent",
+    "byDomain": "Accuracy by Domain",
+    "trendByRound": "Accuracy Trend",
+    "recentVerified": "Recently Verified Predictions",
+    "hit": "Hit",
+    "partial": "Partial",
+    "miss": "Miss",
+    "pending": "Pending",
+    "verified": "verified",
+    "accuracy": "Accuracy",
+    "totalPreds": "Total Preds",
+    "status": "Status",
+    "agent": "Agent",
+    "prediction": "Prediction",
+    "domain": "Domain",
+    "conf": "Conf.",
+    "note": "Note",
+    "time": "Time",
+    "noData": "No verified predictions yet",
+    "noDataHint": "After predictions are verified (every 12 hours), accuracy data will appear here. Run a prediction first."
+  },
+  "sim": {
+    "sentimentIndex": "Sentiment Index",
+    "reachPct": "Reach %",
+    "sentimentLine": "Sentiment",
+    "polarizationLine": "Polarization",
+    "propagationProcess": "Propagation Process",
+    "spreaders": "Spreaders",
+    "newActivated": "New Activated",
+    "contrarianActivated": "Contrarian",
+    "mcIndicators": "Monte Carlo Indicators",
+    "avgTrust": "Avg Trust %",
+    "incomingBelief": "Incoming Belief %",
+    "counterNarrative": "Counter-narrative"
+  },
+  "prediction": {
+    "evidence": "Data Evidence",
+    "risks": "Risk Factors"
   },
   "confidence": "confidence",
   "wildcard": "wildcard",

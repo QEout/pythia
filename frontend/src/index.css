@@ -1,13 +1,39 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --text-primary: #fafafa;
+  --text-secondary: #e4e4e7;
+  --text-muted: #a1a1aa;
+  --text-dim: #71717a;
+}
+
+html, body, #root { height: 100%; }
+
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 code, .mono { font-family: 'JetBrains Mono', monospace; }
+
+/* Increase default text contrast */
+* {
+  --tw-text-opacity: 1;
+}
+
+/* Override Zinc colors for better readability (boost contrast) */
+.text-zinc-200 { color: #f4f4f5 !important; }
+.text-zinc-300 { color: #f4f4f5 !important; }
+.text-zinc-400 { color: #e4e4e7 !important; }
+.text-zinc-500 { color: #d4d4d8 !important; }
+.text-zinc-600 { color: #cbd5e1 !important; }
+.text-zinc-700 { color: #94a3b8 !important; }
+.text-zinc-800 { color: #64748b !important; }
 
 @layer utilities {
   .glass {

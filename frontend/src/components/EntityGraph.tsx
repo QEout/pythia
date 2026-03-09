@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Network, X, Maximize2, Minimize2, Tag, Clock, Target, Link2, FileText, History, CheckCircle2, XCircle, AlertCircle, Zap, ChevronRight } from 'lucide-react'
 import * as d3 from 'd3'
+import { toLocalTime } from '../utils/time'
 
 interface Props {
   entities?: [string, number][]
@@ -107,8 +108,8 @@ function EntityDetailPanel({ nodeName, nodeColor, nodeType, onClose }: {
         {/* Time range */}
         {detail && (
           <div className="flex items-center gap-3 mt-2 text-[8px] text-zinc-600 font-mono">
-            <span className="flex items-center gap-1"><Clock size={8} /> 首次: {detail.first_seen?.slice(0, 16)}</span>
-            <span>最近: {detail.last_seen?.slice(0, 16)}</span>
+            <span className="flex items-center gap-1"><Clock size={8} /> 首次: {toLocalTime(detail.first_seen)}</span>
+            <span>最近: {toLocalTime(detail.last_seen)}</span>
           </div>
         )}
       </div>
@@ -184,7 +185,7 @@ function EntityDetailPanel({ nodeName, nodeColor, nodeType, onClose }: {
                             <span className="text-[8px] text-zinc-700 font-mono">{Math.round(m.confidence * 100)}%</span>
                           </div>
                           <p className="text-[9px] text-zinc-500 line-clamp-2 mt-0.5">{m.prediction}</p>
-                          <span className="text-[7px] text-zinc-700 font-mono">{m.ts}</span>
+                          <span className="text-[7px] text-zinc-700 font-mono">{toLocalTime(m.ts)}</span>
                         </div>
                       </div>
                     ))}
@@ -214,7 +215,7 @@ function EntityDetailPanel({ nodeName, nodeColor, nodeType, onClose }: {
                           {p.agent_name}
                         </span>
                         <span className="text-[8px] text-zinc-700 px-1.5 py-0.5 rounded bg-zinc-900 font-mono">{p.domain}</span>
-                        <span className="text-[7px] text-zinc-700 font-mono">{p.ts?.slice(0, 16)}</span>
+                        <span className="text-[7px] text-zinc-700 font-mono">{toLocalTime(p.ts)}</span>
                       </div>
                       {p.verify_note && (
                         <p className="text-[8px] text-zinc-600 mt-1 italic">
@@ -301,7 +302,7 @@ export default function EntityGraph({ entities: propEntities }: Props) {
     fetch('/api/entities').then(r => r.json()).then(setApiEntities).catch(() => {})
   }, [])
 
-  const buildGraph = useCallback(() => {
+    const buildGraph = useCallback(() => {
     const raw = apiEntities.length > 0
       ? apiEntities.map((e: any) => ({
           name: e.entity,
@@ -310,8 +311,9 @@ export default function EntityGraph({ entities: propEntities }: Props) {
           contexts: e.context ? [e.context] : [],
           lastSeen: e.last_seen,
           firstSeen: e.first_seen,
+          relations: e.relations ?? [],
         }))
-      : (propEntities ?? []).map(([name, count]) => ({ name, type: 'topic', count, contexts: [], lastSeen: '', firstSeen: '' }))
+      : (propEntities ?? []).map(([name, count]) => ({ name, type: 'topic', count, contexts: [], lastSeen: '', firstSeen: '', relations: [] }))
 
     if (raw.length === 0) return { nodes: [], edges: [] }
 
@@ -337,28 +339,53 @@ export default function EntityGraph({ entities: propEntities }: Props) {
     }))
 
     const edges: GEdge[] = []
-    const pairCounts = new Map<string, number>()
+    const edgeKinds = new Map<string, Set<'rel' | 'co'>>() // pairKey -> kinds
 
+    // Create a map for quick entity lookup by name
+    const entityNameToIdx = new Map<string, number>()
+    raw.forEach((e, i) => entityNameToIdx.set(e.name.toLowerCase(), i))
+
+    const addKind = (i: number, j: number, kind: 'rel' | 'co') => {
+      const a = Math.min(i, j)
+      const b = Math.max(i, j)
+      if (a === b) return
+      const key = `${a}-${b}`
+      const set = edgeKinds.get(key) ?? new Set()
+      set.add(kind)
+      edgeKinds.set(key, set)
+    }
+
+    // 1) Real relations from backend (authoritative)
+    raw.forEach((sourceEntity, i) => {
+      const rels: string[] = Array.isArray(sourceEntity.relations) ? sourceEntity.relations : []
+      for (const relName of rels) {
+        const targetIdx = entityNameToIdx.get(String(relName).toLowerCase())
+        if (targetIdx !== undefined) addKind(i, targetIdx, 'rel')
+      }
+    })
+
+    // 2) Context co-mention (semantic, but weaker than explicit relations)
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = raw[i], b = raw[j]
-        const shared = a.contexts.some((c: string) =>
-          b.contexts.some((bc: string) => c && bc && (c.includes(b.name) || bc.includes(a.name)))
-        )
-        const sameType = a.type === b.type && a.type !== 'topic'
-        if (shared || (sameType && Math.random() < 0.35) || (!shared && !sameType && Math.random() < 0.12)) {
-          const pairKey = `${i}-${j}`
-          const count = (pairCounts.get(pairKey) ?? 0) + 1
-          pairCounts.set(pairKey, count)
-          const curvature = count > 1 ? ((count / 2) - 0.5) * 0.6 : 0
-          edges.push({
-            source: nodes[i],
-            target: nodes[j],
-            label: shared ? 'co-mentioned' : sameType ? 'same-type' : 'related',
-            curvature,
-          })
-        }
+        const aHasB = a.contexts.some((c: string) => c && b.name && c.toLowerCase().includes(b.name.toLowerCase()))
+        const bHasA = b.contexts.some((c: string) => c && a.name && c.toLowerCase().includes(a.name.toLowerCase()))
+        if (aHasB || bHasA) addKind(i, j, 'co')
       }
+    }
+
+    // Materialize edges
+    for (const [pairKey, kinds] of edgeKinds.entries()) {
+      const [aStr, bStr] = pairKey.split('-')
+      const a = Number(aStr)
+      const b = Number(bStr)
+      const label = kinds.has('rel') ? 'related' : 'co-occur'
+      edges.push({
+        source: nodes[a],
+        target: nodes[b],
+        label,
+        curvature: 0,
+      })
     }
 
     return { nodes, edges }
@@ -409,29 +436,45 @@ export default function EntityGraph({ entities: propEntities }: Props) {
       .on('zoom', (event) => g.attr('transform', event.transform))
     svg.call(zoom)
 
+    // Tighter, more "web-like" layout:
+    // - shorter links (especially explicit relations)
+    // - lower repulsion so graph doesn't explode
+    // - stronger centering so it stays in frame
     const simulation = d3.forceSimulation<GNode>(nodes)
-      .force('link', d3.forceLink<GNode, GEdge>(edges).id(d => d.id).distance(140))
-      .force('charge', d3.forceManyBody().strength(-380))
+      .force(
+        'link',
+        d3.forceLink<GNode, GEdge>(edges)
+          .id(d => d.id)
+          .distance((d: any) => d.label === 'related' ? 80 : 120)
+          .strength((d: any) => d.label === 'related' ? 1.0 : 0.55),
+      )
+      .force('charge', d3.forceManyBody().strength(-320))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collide', d3.forceCollide(45))
-      .force('x', d3.forceX(width / 2).strength(0.04))
-      .force('y', d3.forceY(height / 2).strength(0.04))
+      .force('collide', d3.forceCollide(40))
+      .force('x', d3.forceX(width / 2).strength(0.08))
+      .force('y', d3.forceY(height / 2).strength(0.08))
 
     const linkGroup = g.append('g')
     const link = linkGroup.selectAll<SVGPathElement, GEdge>('path')
       .data(edges).enter().append('path')
-      .attr('fill', 'none').attr('stroke', '#52525b')
-      .attr('stroke-width', 1.2).attr('stroke-opacity', 0.5)
+      .attr('fill', 'none').attr('stroke', (d: any) => d.label === 'related' ? '#e4e4e7' : '#71717a')
+      .attr('stroke-width', (d: any) => d.label === 'related' ? 1.8 : 1.2)
+      .attr('stroke-opacity', (d: any) => d.label === 'related' ? 0.65 : 0.35)
       .attr('marker-end', 'url(#arrowhead)')
+      .style('filter', (d: any) => d.label === 'related' ? 'drop-shadow(0 0 6px rgba(139,92,246,0.25))' : 'none')
 
     const edgeLabelGroup = g.append('g')
     const edgeLabels = edgeLabelGroup.selectAll<SVGTextElement, GEdge>('text')
       .data(edges).enter().append('text')
       .text(d => d.label)
-      .attr('font-size', '8px').attr('fill', '#71717a')
+      .attr('font-size', '9px').attr('fill', '#e4e4e7')
+      .attr('font-weight', '500')
       .attr('text-anchor', 'middle').attr('dy', -4)
       .style('pointer-events', 'none')
+      // edge labels are high-noise; only show for explicit relations
       .style('display', showLabels ? 'block' : 'none')
+      .style('text-shadow', '0 1px 4px rgba(0,0,0,0.95)')
+      .style('opacity', (d: any) => d.label === 'related' ? 0.9 : 0)
 
     const nodeGroup = g.append('g')
     const maxCount = Math.max(1, ...nodes.map(n => n.count))
@@ -441,21 +484,22 @@ export default function EntityGraph({ entities: propEntities }: Props) {
       .data(nodes).enter().append('circle')
       .attr('r', d => radiusScale(d.count))
       .attr('fill', d => d.color)
-      .attr('stroke', '#fafafa').attr('stroke-width', 2)
+      .attr('stroke', '#ffffff').attr('stroke-width', 2.5)
       .attr('cursor', 'pointer')
+      .style('filter', 'drop-shadow(0 0 6px rgba(255,255,255,0.3))')
       .on('mouseenter', function (_event, d) {
-        d3.select(this).attr('stroke', '#e4e4e7').attr('stroke-width', 3)
+        d3.select(this).attr('stroke', '#ffffff').attr('stroke-width', 4)
         link.attr('stroke', (e: any) =>
-          e.source.id === d.id || e.target.id === d.id ? d.color : '#52525b'
+          e.source.id === d.id || e.target.id === d.id ? d.color : '#71717a'
         ).attr('stroke-opacity', (e: any) =>
-          e.source.id === d.id || e.target.id === d.id ? 0.9 : 0.2
+          e.source.id === d.id || e.target.id === d.id ? 1 : 0.15
         ).attr('stroke-width', (e: any) =>
-          e.source.id === d.id || e.target.id === d.id ? 2 : 1.2
+          e.source.id === d.id || e.target.id === d.id ? 2.5 : 1
         )
       })
       .on('mouseleave', function () {
-        d3.select(this).attr('stroke', '#fafafa').attr('stroke-width', 2)
-        link.attr('stroke', '#52525b').attr('stroke-opacity', 0.5).attr('stroke-width', 1.2)
+        d3.select(this).attr('stroke', '#ffffff').attr('stroke-width', 2.5)
+        link.attr('stroke', '#52525b').attr('stroke-opacity', 0.6).attr('stroke-width', 1.2)
       })
       .on('click', (_event, d) => {
         setSelectedNode(prev => prev?.id === d.id ? null : d)
@@ -474,14 +518,17 @@ export default function EntityGraph({ entities: propEntities }: Props) {
         })
       )
 
-    nodeGroup.selectAll<SVGTextElement, GNode>('text')
+    const nodeText = nodeGroup.selectAll<SVGTextElement, GNode>('text')
       .data(nodes).enter().append('text')
-      .text(d => d.name.length > 12 ? d.name.slice(0, 12) + '…' : d.name)
-      .attr('font-size', '10px').attr('fill', '#d4d4d8')
+      .text(d => d.name.length > 14 ? d.name.slice(0, 14) + '…' : d.name)
+      .attr('font-size', '12px').attr('fill', '#ffffff')
       .attr('font-family', "'JetBrains Mono', 'SF Mono', monospace")
-      .attr('font-weight', '500')
-      .attr('dx', d => radiusScale(d.count) + 4).attr('dy', 4)
+      .attr('font-weight', '600')
+      .attr('dx', d => radiusScale(d.count) + 6).attr('dy', 4)
       .style('pointer-events', 'none')
+      .style('text-shadow', '0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8)')
+      // show labels only for top nodes by default (less clutter)
+      .style('opacity', (d: any) => d.count >= d3.quantile(nodes.map(n => n.count).sort(d3.ascending), 0.7)! ? 1 : 0.35)
 
     simulation.on('tick', () => {
       link.attr('d', (d: any) => {
@@ -496,7 +543,7 @@ export default function EntityGraph({ entities: propEntities }: Props) {
       })
       edgeLabels.attr('x', (d: any) => (d.source.x + d.target.x) / 2).attr('y', (d: any) => (d.source.y + d.target.y) / 2)
       node.attr('cx', (d: any) => d.x).attr('cy', (d: any) => d.y)
-      nodeGroup.selectAll<SVGTextElement, GNode>('text').attr('x', (d: any) => d.x).attr('y', (d: any) => d.y)
+      nodeText.attr('x', (d: any) => d.x).attr('y', (d: any) => d.y)
     })
 
     svg.on('click', (event) => {
@@ -542,7 +589,7 @@ export default function EntityGraph({ entities: propEntities }: Props) {
       </div>
 
       <div ref={containerRef} className="relative rounded-lg overflow-hidden border"
-        style={{ height: isMaximized ? 'calc(100vh - 60px)' : 520, background: '#18181b', borderColor: '#27272a' }}>
+        style={{ height: isMaximized ? 'calc(100vh - 60px)' : 'clamp(600px, 74vh, 900px)', background: '#0b0b10', borderColor: '#2a2a3e', boxShadow: '0 0 0 1px rgba(139,92,246,0.08), 0 30px 80px rgba(0,0,0,0.45)' }}>
 
         {graphNodes.length > 0 ? (
           <svg ref={svgRef} className="w-full h-full" />

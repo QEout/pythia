@@ -42,7 +42,8 @@ Option A (final answer):
       "prediction": "specific falsifiable prediction",
       "confidence": 0.7,
       "reasoning": "why (1-2 sentences)",
-      "domain": "{domain}"
+      "domain": "{domain}",
+      "time_horizon_hours": 6
     }}
   ],
   "dissent": "what other agents might get wrong (1 sentence)"
@@ -74,7 +75,7 @@ Data includes: WorldMonitor geopolitical signals, aviation disruptions, climate 
 
 Given real-time world data:
 1. Identify the 2-3 most significant political/policy signals
-2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about what will happen in the next 24 hours
+2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about what will happen in the next 6-12 hours
 3. Assign a confidence score (0.0-1.0) to each
 4. Name specific entities, timeframes, and measurable outcomes
 
@@ -90,7 +91,7 @@ Domain: technology, AI/ML, startups, product launches, open source, developer ec
 
 Given real-time world data:
 1. Identify the 2-3 most significant tech signals
-2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about the next 24 hours
+2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about the next 6-12 hours
 3. Focus on: product announcements, AI breakthroughs, viral tools, developer sentiment shifts
 
 """ + TOOL_DESCRIPTIONS + "\n\n" + _base_output_schema("tech"),
@@ -105,7 +106,7 @@ Domain: social media trends, Weibo hot search, viral content, public sentiment, 
 
 Given real-time world data (especially Weibo hot search and Google Trends):
 1. Identify the 2-3 most interesting social media signals and emerging narratives
-2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about what will trend in the next 24 hours
+2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about what will trend in the next 6 hours
 3. Focus on: hot searches, dominant narratives, erupting controversies
 
 """ + TOOL_DESCRIPTIONS + "\n\n" + _base_output_schema("opinion"),
@@ -122,7 +123,7 @@ Enhanced data: WorldMonitor real-time quotes (AAPL, MSFT, NVDA...), commodities 
 
 Given real-time financial data:
 1. Identify the 2-3 most significant financial signals
-2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about price movements in the next 24 hours
+2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about price movements in the next 6 hours
 3. Be specific: name assets, direction, approximate magnitude
 
 """ + TOOL_DESCRIPTIONS + "\n\n" + _base_output_schema("finance"),
@@ -137,7 +138,7 @@ Domain: entertainment, pop culture, lifestyle trends, viral content, generationa
 
 Given real-time world data:
 1. Identify the 2-3 most interesting cultural signals
-2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about cultural trends in the next 24 hours
+2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about cultural trends in the next 6-12 hours
 3. Focus on: viral content, cultural conversations, product/show/meme breakthroughs
 
 """ + TOOL_DESCRIPTIONS + "\n\n" + _base_output_schema("culture"),
@@ -154,7 +155,7 @@ Enhanced data: USGS earthquakes, climate anomalies, aviation disruptions, ACLED 
 
 Given real-time world data:
 1. Look for ANOMALIES — things that don't fit the pattern, especially cross-domain
-2. Make 1-2 SPECIFIC predictions about unexpected events in the next 24-72 hours
+2. Make 1-2 SPECIFIC predictions about unexpected events in the next 12-24 hours
 3. Your predictions should have LOWER confidence but HIGHER impact
 4. Focus on: seismic + climate + aviation as early warning, hidden correlations, systemic fragility
 
@@ -174,7 +175,7 @@ Data includes: ACLED conflict events, GDELT military themes, geopolitical tensio
 
 Given real-time world data:
 1. Identify the 2-3 most significant military/security signals
-2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about military or security developments in the next 24-48 hours
+2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about military or security developments in the next 12 hours
 3. Focus on: troop movements, escalation/de-escalation signals, arms deals, naval deployments
 
 """ + TOOL_DESCRIPTIONS + "\n\n" + _base_output_schema("military"),
@@ -189,7 +190,7 @@ Domain: pandemics, disease outbreaks, drug approvals, biotech IPOs, health polic
 
 Given real-time world data:
 1. Identify any health-related signals in the news, trends, or social media
-2. Make 1-2 SPECIFIC, FALSIFIABLE predictions about health/biotech developments in the next 24-48 hours
+2. Make 1-2 SPECIFIC, FALSIFIABLE predictions about health/biotech developments in the next 12 hours
 3. Focus on: outbreak signals, drug approval news, health policy shifts, biotech funding rounds
 
 """ + TOOL_DESCRIPTIONS + "\n\n" + _base_output_schema("health"),
@@ -206,7 +207,7 @@ Enhanced data: Climate anomalies, NASA FIRMS fire data, commodity prices (oil, g
 
 Given real-time world data:
 1. Identify the 2-3 most significant energy/climate signals
-2. Make 1-2 SPECIFIC, FALSIFIABLE predictions about energy or climate developments in the next 24-48 hours
+2. Make 1-2 SPECIFIC, FALSIFIABLE predictions about energy or climate developments in the next 12 hours
 3. Focus on: energy price movements, climate disaster developments, policy announcements, grid stress events
 
 """ + TOOL_DESCRIPTIONS + "\n\n" + _base_output_schema("energy"),
@@ -223,7 +224,7 @@ Data includes: Weibo hot search, Chinese social media trends, Google Trends for 
 
 Given real-time world data (especially Chinese sources):
 1. Identify the 2-3 most significant China-related signals
-2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about Chinese developments in the next 24-48 hours
+2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about Chinese developments in the next 6-12 hours
 3. Focus on: policy signals, social media eruptions, regulatory moves, economic indicators
 
 """ + TOOL_DESCRIPTIONS + "\n\n" + _base_output_schema("china"),
@@ -240,7 +241,7 @@ Enhanced data: CoinGecko top 20 + trending coins, Crypto Fear & Greed Index, Pol
 
 Given real-time crypto data:
 1. Identify the 2-3 most significant on-chain or crypto market signals
-2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about crypto movements in the next 24 hours
+2. Make 1-3 SPECIFIC, FALSIFIABLE predictions about crypto movements in the next 6 hours
 3. Be specific: name tokens, direction, catalysts. Track whale movements and exchange flows.
 
 """ + TOOL_DESCRIPTIONS + "\n\n" + _base_output_schema("crypto"),
@@ -257,7 +258,7 @@ Data includes: GDACS disasters, NASA FIRMS fires, climate anomalies, geopolitica
 
 Given real-time world data:
 1. Identify signals that could disrupt global supply chains (natural disasters, conflicts, policy changes)
-2. Make 1-2 SPECIFIC, FALSIFIABLE predictions about supply chain impacts in the next 24-72 hours
+2. Make 1-2 SPECIFIC, FALSIFIABLE predictions about supply chain impacts in the next 12 hours
 3. Focus on: shipping route disruptions, commodity supply shocks, semiconductor bottlenecks, sanctions cascades
 
 """ + TOOL_DESCRIPTIONS + "\n\n" + _base_output_schema("supply_chain"),

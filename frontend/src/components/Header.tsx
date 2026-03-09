@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Globe, Zap, Network, Activity, Radio, Clock } from 'lucide-react'
+import { Globe, Zap, Network, Activity, Radio, Clock, Target } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 interface Props {
@@ -17,6 +17,7 @@ const TABS = [
   { id: 'dashboard', icon: Activity, label: 'tabs.dashboard' },
   { id: 'world', icon: Globe, label: 'tabs.world' },
   { id: 'entities', icon: Network, label: 'tabs.entities' },
+  { id: 'accuracy', icon: Target, label: 'tabs.accuracy' },
 ]
 
 export default function Header({
@@ -31,7 +32,7 @@ export default function Header({
     return () => clearInterval(iv)
   }, [])
 
-  const utc = time.toISOString().slice(11, 19)
+  const localTime = time.toLocaleTimeString(undefined, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
   return (
     <header className="sticky top-0 z-50 border-b border-border">
@@ -41,18 +42,18 @@ export default function Header({
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center text-lg font-bold shadow-lg shadow-violet-500/20">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 via-purple-600 to-cyan-500 flex items-center justify-center text-xl font-bold shadow-lg shadow-violet-500/30 border border-white/10">
                   P
                 </div>
                 <div>
-                  <h1 className="text-base font-bold text-white tracking-tight leading-none">{t('app.title')}</h1>
-                  <p className="text-[9px] text-zinc-600 hidden sm:block mt-0.5">{t('app.subtitle')}</p>
+                  <h1 className="text-lg font-bold text-white tracking-tight leading-none">{t('app.title')}</h1>
+                  <p className="text-[10px] text-zinc-500 hidden sm:block mt-0.5 font-medium">{t('app.subtitle')}</p>
                 </div>
               </div>
 
               <div className="hidden lg:flex items-center gap-1 ml-4 text-[10px] text-zinc-600 font-mono">
                 <Clock size={10} />
-                <span>{utc} UTC</span>
+                <span>{localTime}</span>
               </div>
             </div>
 
@@ -117,13 +118,13 @@ export default function Header({
                 <button
                   key={tab.id}
                   onClick={() => onTabChange(tab.id)}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-all ${
+                  className={`flex items-center gap-1.5 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
                     active
-                      ? 'border-violet-500 text-white'
+                      ? 'border-violet-500 text-white bg-gradient-to-b from-violet-500/10 to-transparent'
                       : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
                   }`}
                 >
-                  <Icon size={13} className={active ? 'text-violet-400' : ''} />
+                  <Icon size={14} className={active ? 'text-violet-400' : 'text-zinc-600'} />
                   {t(tab.label)}
                 </button>
               )

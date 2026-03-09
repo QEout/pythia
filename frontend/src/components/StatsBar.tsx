@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Users, Target, TrendingUp, Radio, Zap, Clock } from 'lucide-react'
+import { toLocalShort } from '../utils/time'
 
 interface Props {
   round: any
@@ -79,7 +80,7 @@ export default function StatsBar({ round, agentScores, consensusCount }: Props) 
     {
       label: t('stats.lastRound'),
       value: round?.round_id?.slice(2, 10) ?? '—',
-      sub: round?.ts ? new Date(round.ts).toLocaleTimeString() : '',
+      sub: round?.ts ? toLocalShort(round.ts) : '',
       icon: Clock,
       color: 'text-zinc-400',
       iconBg: 'bg-zinc-500/10',

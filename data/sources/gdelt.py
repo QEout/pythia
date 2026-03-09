@@ -1,61 +1,69 @@
 """GDELT (Global Database of Events, Language, and Tone) — free geopolitical event data.
 
-Inspired by WorldMonitor's GDELT integration. GDELT monitors the world's news
-media and identifies events, themes, and emotions in real time.
 Free API: https://api.gdeltproject.org/ (no auth required).
+Rate limit: 1 request per 5 seconds.
 """
 
 from __future__ import annotations
+import asyncio
 import logging
 import httpx
 
 log = logging.getLogger(__name__)
 
 GDELT_DOC_API = "https://api.gdeltproject.org/api/v2/doc/doc"
-GDELT_GEO_API = "https://api.gdeltproject.org/api/v2/geo/geo"
 
 
 async def fetch_gdelt_trending() -> list[dict]:
-    """Fetch trending themes and articles from GDELT's DOC API."""
+    """Fetch trending articles from GDELT's DOC API."""
     items: list[dict] = []
     try:
-        async with httpx.AsyncClient(timeout=20) as c:
+        async with httpx.AsyncClient(timeout=25) as c:
             r = await c.get(GDELT_DOC_API, params={
-                "query": "",
-                "mode": "ToneChart",
+                "query": "(conflict OR crisis OR sanctions OR geopolitics)",
+                "mode": "ArtList",
                 "timespan": "24h",
+                "maxrecords": "25",
                 "format": "json",
             })
-            if r.status_code == 200:
-                data = r.json()
-                for article in (data if isinstance(data, list) else data.get("articles", []))[:15]:
-                    if isinstance(article, dict):
+            if r.status_code == 200 and r.text.strip().startswith("{"):
+                try:
+                    data = r.json()
+                    for article in (data.get("articles", []) if isinstance(data, dict) else [])[:15]:
                         items.append({
                             "title": article.get("title", ""),
                             "url": article.get("url", ""),
                             "source": article.get("domain", "GDELT"),
                             "tone": article.get("tone", 0),
-                            "language": article.get("language", ""),
-                            "category": "gdelt_trending",
+                            "category": "gdelt_conflict",
                         })
+                except (ValueError, KeyError):
+                    pass
+            elif r.status_code == 429:
+                raise RuntimeError("GDELT rate-limited (429), will use stale cache")
+
+            await asyncio.sleep(6)
 
             r2 = await c.get(GDELT_DOC_API, params={
-                "query": "conflict OR war OR crisis OR sanction",
+                "query": "(trade OR economy OR technology OR election)",
                 "mode": "ArtList",
                 "timespan": "24h",
-                "maxrecords": "20",
+                "maxrecords": "15",
                 "format": "json",
             })
-            if r2.status_code == 200:
-                data2 = r2.json()
-                for article in (data2.get("articles", []) if isinstance(data2, dict) else [])[:15]:
-                    items.append({
-                        "title": article.get("title", ""),
-                        "url": article.get("url", ""),
-                        "source": article.get("domain", "GDELT"),
-                        "tone": article.get("tone", 0),
-                        "category": "gdelt_conflict",
-                    })
+            if r2.status_code == 200 and r2.text.strip().startswith("{"):
+                try:
+                    data2 = r2.json()
+                    for article in (data2.get("articles", []) if isinstance(data2, dict) else [])[:10]:
+                        items.append({
+                            "title": article.get("title", ""),
+                            "url": article.get("url", ""),
+                            "source": article.get("domain", "GDELT"),
+                            "tone": article.get("tone", 0),
+                            "category": "gdelt_trending",
+                        })
+                except (ValueError, KeyError):
+                    pass
     except Exception as e:
         log.warning("GDELT fetch failed: %s", e)
 

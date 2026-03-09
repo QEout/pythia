@@ -139,8 +139,19 @@ def format_memory_prompt(agent_name: str) -> str:
         if m.get("lesson"):
             lines.append(f'    Lesson: {m["lesson"]}')
 
+    hit_count = sum(1 for m in memories if m.get("outcome") == "hit")
+    partial_count = sum(1 for m in memories if m.get("outcome") == "partial")
+    miss_count = sum(1 for m in memories if m.get("outcome") == "miss")
+    total_verified = hit_count + partial_count + miss_count
+
     lines.append("")
-    lines.append("Use your track record to calibrate confidence. If you've been wrong about a domain, be more cautious. If you've been right, trust your signals more.")
+    if total_verified > 0:
+        accuracy = (hit_count + partial_count) / total_verified * 100
+        lines.append(f"Track record: {accuracy:.0f}% accuracy ({hit_count} hits, {partial_count} partial, {miss_count} misses out of {total_verified}).")
+    lines.append("REFLECT on your lessons above. Adjust your reasoning:")
+    lines.append("- If a signal type repeatedly led to misses, STOP relying on it alone; cross-validate with different data.")
+    lines.append("- If a specific reasoning pattern led to hits, reinforce it but verify it still holds.")
+    lines.append("- Calibrate confidence DOWN if you've been overconfident (high confidence + misses), UP if underconfident (low confidence + hits).")
     return "\n".join(lines)
 
 
@@ -151,10 +162,24 @@ def upsert_entity(entity: str, entity_type: str, context: str = "",
     """Insert or update an entity in the knowledge graph."""
     conn = _conn()
     existing = conn.execute(
-        "SELECT id, mention_count FROM entity_graph WHERE entity = ? AND entity_type = ?",
+        "SELECT id, mention_count, context, relations FROM entity_graph WHERE entity = ? AND entity_type = ?",
         (entity, entity_type),
     ).fetchone()
+    new_relations = [r for r in (relations or []) if r and r != entity]
     if existing:
+        merged_relations: list[str] = []
+        try:
+            old_relations = json.loads(existing["relations"] or "[]")
+            if isinstance(old_relations, list):
+                merged_relations.extend(str(r) for r in old_relations if r)
+        except Exception:
+            pass
+        merged_relations.extend(new_relations)
+        merged_relations = list(dict.fromkeys(merged_relations))[:25]
+
+        existing_context = existing["context"] or ""
+        merged_context_parts = [p for p in [context[:220], existing_context[:380]] if p]
+        merged_context = " | ".join(dict.fromkeys(merged_context_parts))
         conn.execute(
             """UPDATE entity_graph
                SET mention_count = mention_count + 1,
@@ -162,12 +187,12 @@ def upsert_entity(entity: str, entity_type: str, context: str = "",
                    context = ?,
                    relations = ?
                WHERE id = ?""",
-            (context[:500], json.dumps(relations or []), existing["id"]),
+            (merged_context[:500], json.dumps(merged_relations), existing["id"]),
         )
     else:
         conn.execute(
             "INSERT INTO entity_graph (entity, entity_type, context, relations) VALUES (?,?,?,?)",
-            (entity, entity_type, context[:500], json.dumps(relations or [])),
+            (entity, entity_type, context[:500], json.dumps(new_relations)),
         )
     conn.commit()
     conn.close()
@@ -175,16 +200,29 @@ def upsert_entity(entity: str, entity_type: str, context: str = "",
 
 def get_trending_entities(limit: int = 15) -> list[dict]:
     """Get entities with most recent mentions — signals what the world is focused on."""
+    import json
     conn = _conn()
     rows = conn.execute(
-        """SELECT entity, entity_type, mention_count, last_seen, context
+        """SELECT entity, entity_type, mention_count, last_seen, context, relations
            FROM entity_graph
            ORDER BY last_seen DESC, mention_count DESC
            LIMIT ?""",
         (limit,),
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    results = []
+    for r in rows:
+        d = dict(r)
+        rels = d.get('relations')
+        if rels:
+            try:
+                d['relations'] = json.loads(rels) if isinstance(rels, str) else rels
+            except:
+                d['relations'] = []
+        else:
+            d['relations'] = []
+        results.append(d)
+    return results
 
 
 def format_entity_context() -> str:

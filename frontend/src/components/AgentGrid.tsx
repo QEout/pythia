@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp, X, Newspaper, Brain, Target, History, AlertCircle, CheckCircle2, XCircle, Clock, Zap } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
+import { toLocalTime } from '../utils/time'
 
 interface Props {
   analyses: any[]
@@ -211,7 +212,7 @@ function AgentDetailPanel({ agentName, analysis, onClose }: { agentName: string;
                             <span className="text-[8px] font-mono px-1.5 py-0.5 rounded" style={{ background: `${style.accent}12`, color: style.accent }}>
                               {news.category}
                             </span>
-                            {news.time && <span className="text-[8px] text-zinc-700 font-mono">{news.time}</span>}
+                            {news.time && <span className="text-[8px] text-zinc-700 font-mono">{toLocalTime(news.time)}</span>}
                           </div>
                         </div>
                       </div>
@@ -253,7 +254,7 @@ function AgentDetailPanel({ agentName, analysis, onClose }: { agentName: string;
                             <span className="text-[9px] font-mono" style={{ color: style.accent }}>
                               {Math.round((m.confidence ?? 0) * 100)}%
                             </span>
-                            <span className="text-[8px] text-zinc-700 font-mono">{m.ts}</span>
+                            <span className="text-[8px] text-zinc-700 font-mono">{toLocalTime(m.ts)}</span>
                             {m.outcome && (
                               <span className={`text-[8px] font-mono font-bold uppercase ${
                                 m.outcome === 'hit' ? 'text-green-500' : m.outcome === 'miss' ? 'text-red-500' : 'text-amber-500'
@@ -296,7 +297,7 @@ function AgentDetailPanel({ agentName, analysis, onClose }: { agentName: string;
                             <span className="text-[9px] font-mono" style={{ color: style.accent }}>
                               {Math.round((p.confidence ?? 0) * 100)}%
                             </span>
-                            <span className="text-[8px] text-zinc-700 font-mono">{p.ts}</span>
+                            <span className="text-[8px] text-zinc-700 font-mono">{toLocalTime(p.ts)}</span>
                             {p.verify_note && <span className="text-[8px] text-zinc-600 italic">— {p.verify_note}</span>}
                           </div>
                         </div>

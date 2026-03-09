@@ -50,15 +50,17 @@ async def run_prediction_cycle_streaming() -> AsyncGenerator[str, None]:
     yield _sse_event("step", {
         "step": 1, "total": total_steps,
         "label": "collecting_data",
-        "message": "正在从 13+ 数据源收集实时数据...",
-        "message_en": "Collecting real-time data from 13+ sources...",
+        "message": "正在从 16 个数据源收集实时数据...",
+        "message_en": "Collecting real-time data from 16 sources...",
     })
 
     # 1. Collect world data
     snapshot = await collect_world_data()
     for domain in ["news", "weibo", "trends", "crypto", "finance",
-                    "conflicts", "gdelt", "predictions_market", "fires"]:
-        items = getattr(snapshot, domain)
+                    "earthquakes", "climate", "disruptions", "fear_greed",
+                    "conflicts", "gdelt", "predictions_market", "fires",
+                    "fred_indicators", "who_alerts", "stock_quotes"]:
+        items = getattr(snapshot, domain, None)
         if items:
             save_snapshot(domain, items)
 
@@ -85,12 +87,12 @@ async def run_prediction_cycle_streaming() -> AsyncGenerator[str, None]:
         "message_en": f"Running {len(CHIEFS)} chief agents (ReACT reasoning)...",
     })
 
-    # 3. Run chief agents — stream each agent's result as it completes
-    world_summary = snapshot.summary()
+    # 3. Run chief agents — each gets a domain-specific summary
     chief_results: list[tuple] = []
 
     async def run_and_emit(agent):
-        result = await run_chief_agent(agent, world_summary)
+        domain_summary = snapshot.summary(agent.domain)
+        result = await run_chief_agent(agent, domain_summary)
         return (agent, result)
 
     tasks = [asyncio.create_task(run_and_emit(agent)) for agent in CHIEFS]

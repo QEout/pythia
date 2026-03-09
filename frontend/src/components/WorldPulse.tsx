@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { RefreshCw } from 'lucide-react'
 import IntelMap from './IntelMap'
+import { toLocalTime } from '../utils/time'
 
 interface Props {
   data: any
@@ -55,11 +56,11 @@ function IntelPanel({ title, icon, count, severityThresholds, children }: PanelP
   )
 }
 
-function IntelItem({ text, sub, severity: sev }: { text: string; sub?: string; severity?: string }) {
+function IntelItem({ text, sub, severity: sev, url }: { text: string; sub?: string; severity?: string; url?: string }) {
   const dotColor = sev === 'critical' || sev === 'red' ? '#ef4444'
     : sev === 'high' || sev === 'orange' ? '#f59e0b'
     : sev === 'medium' ? '#06b6d4' : '#3f3f46'
-  return (
+  const content = (
     <div className="flex items-start gap-1.5 py-0.5 px-0.5 rounded hover:bg-white/[0.02] transition-colors">
       <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: dotColor }} />
       <div className="flex-1 min-w-0">
@@ -68,6 +69,7 @@ function IntelItem({ text, sub, severity: sev }: { text: string; sub?: string; s
       </div>
     </div>
   )
+  return url ? <a href={url} target="_blank" rel="noreferrer">{content}</a> : content
 }
 
 function StockItem({ item }: { item: any }) {
@@ -106,16 +108,26 @@ function NewsItem({ item, rank }: { item: any; rank: number }) {
     mena: '#f97316', asia: '#06b6d4', science_climate: '#10b981',
   }
   const color = catColor[item.category] ?? '#71717a'
-  return (
-    <div className="flex items-start gap-1.5 py-0.5 px-0.5 hover:bg-white/[0.02] transition-colors">
+  const content = (
+    <div className="flex items-start gap-1.5 py-1 px-0.5 hover:bg-white/[0.03] transition-colors border-b border-zinc-900/40 last:border-b-0">
       <span className="text-[9px] font-mono text-zinc-600 w-4 shrink-0 text-right mt-0.5">{rank}</span>
       <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: color }} />
       <div className="flex-1 min-w-0">
-        <span className="text-[10px] text-zinc-300 font-mono leading-relaxed line-clamp-2">{item.title}</span>
-        <span className="text-[8px] font-mono" style={{ color }}>{item.category?.replace('_', ' ')}</span>
+        <div className="text-[10px] text-zinc-300 font-mono leading-relaxed break-words whitespace-normal">
+          {item.title}
+        </div>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-[8px] font-mono uppercase tracking-wide" style={{ color }}>
+            {item.category?.replace('_', ' ')}
+          </span>
+          {item.source && (
+            <span className="text-[8px] text-zinc-600 font-mono truncate">{item.source}</span>
+          )}
+        </div>
       </div>
     </div>
   )
+  return item.url ? <a href={item.url} target="_blank" rel="noreferrer">{content}</a> : content
 }
 
 export default function WorldPulse({ data, onRefresh }: Props) {
@@ -134,6 +146,13 @@ export default function WorldPulse({ data, onRefresh }: Props) {
   const stocks = data.stocks ?? []
   const fred = data.fred ?? []
   const who = data.who ?? []
+  const weibo = data.weibo ?? []
+  const trends = data.trends ?? []
+  const crypto = data.crypto ?? []
+  const finance = data.finance ?? []
+  const gdelt = data.gdelt ?? []
+  const fredConfigured = data?.meta?.fred_configured
+  const finnhubConfigured = data?.meta?.finnhub_configured
 
   const totalSignals = earthquakes.length + climate.length + disruptions.length + conflicts.length + fires.length + who.length
   const globalSev = severity(totalSignals, [10, 25, 50])
@@ -147,7 +166,7 @@ export default function WorldPulse({ data, onRefresh }: Props) {
           <span className="text-lg">🌍</span>
           <div>
             <h2 className="text-xs font-bold text-zinc-200 uppercase tracking-wider">{t('sections.worldPulse')}</h2>
-            <span className="text-[9px] text-zinc-600 font-mono">{totalSignals} signals · {new Date().toISOString().slice(11, 19)} UTC</span>
+            <span className="text-[9px] text-zinc-600 font-mono">{totalSignals} signals · {new Date().toLocaleTimeString(undefined, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -163,8 +182,8 @@ export default function WorldPulse({ data, onRefresh }: Props) {
       {/* Map */}
       <IntelMap data={data} />
 
-      {/* Signal ribbon — 9 categories */}
-      <div className="grid grid-cols-9 gap-1">
+      {/* Signal ribbon — all 16 source categories */}
+      <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))' }}>
         {[
           { icon: '🌋', label: isZh ? '地震' : 'Seismic',     count: earthquakes.length, th: [5, 15, 30] as [number, number, number] },
           { icon: '🌡️', label: isZh ? '气候' : 'Climate',     count: climate.length,     th: [3, 8, 15]  as [number, number, number] },
@@ -175,6 +194,11 @@ export default function WorldPulse({ data, onRefresh }: Props) {
           { icon: '🎯', label: isZh ? '预测' : 'Prediction',  count: polymarket.length,  th: [3, 8, 15]  as [number, number, number] },
           { icon: '🏥', label: isZh ? '健康' : 'Health',      count: who.length,         th: [2, 5, 10]  as [number, number, number] },
           { icon: '💹', label: isZh ? '股票' : 'Stocks',      count: stocks.length,      th: [5, 10, 15] as [number, number, number] },
+          { icon: '🔥', label: isZh ? '微博' : 'Weibo',       count: weibo.length,       th: [5, 15, 30] as [number, number, number] },
+          { icon: '📈', label: isZh ? '趋势' : 'Trends',      count: trends.length,      th: [5, 15, 30] as [number, number, number] },
+          { icon: '₿',  label: isZh ? '加密' : 'Crypto',      count: crypto.length,      th: [5, 10, 20] as [number, number, number] },
+          { icon: '💰', label: isZh ? '指数' : 'Indices',     count: finance.length,     th: [3, 6, 9]   as [number, number, number] },
+          { icon: '🌐', label: 'GDELT',                       count: gdelt.length,       th: [5, 10, 20] as [number, number, number] },
         ].map((s, i) => {
           const sev = severity(s.count, s.th)
           return (
@@ -191,7 +215,7 @@ export default function WorldPulse({ data, onRefresh }: Props) {
       <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
         {/* News Feed — ranked headlines */}
         <IntelPanel title={isZh ? '新闻头条' : 'News Feed'} icon="📰" count={news.length} severityThresholds={[10, 30, 60]}>
-          {news.slice(0, 20).map((n: any, i: number) => (
+          {news.slice(0, 30).map((n: any, i: number) => (
             <NewsItem key={i} item={n} rank={i + 1} />
           ))}
           {news.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO DATA</div>}
@@ -202,7 +226,11 @@ export default function WorldPulse({ data, onRefresh }: Props) {
           {stocks.slice(0, 15).map((s: any, i: number) => (
             <StockItem key={i} item={s} />
           ))}
-          {stocks.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO API KEY</div>}
+          {stocks.length === 0 && (
+            <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">
+              {finnhubConfigured === false ? 'NO API KEY' : 'NO DATA'}
+            </div>
+          )}
         </IntelPanel>
 
         {/* Macro Economy */}
@@ -210,13 +238,17 @@ export default function WorldPulse({ data, onRefresh }: Props) {
           {fred.map((f: any, i: number) => (
             <FredItem key={i} item={f} />
           ))}
-          {fred.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO API KEY</div>}
+          {fred.length === 0 && (
+            <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">
+              {fredConfigured === false ? 'NO API KEY' : 'NO DATA'}
+            </div>
+          )}
         </IntelPanel>
 
         {/* Health Alerts */}
         <IntelPanel title={isZh ? '健康预警' : 'Health Alerts'} icon="🏥" count={who.length} severityThresholds={[2, 5, 10]}>
           {who.slice(0, 12).map((w: any, i: number) => (
-            <IntelItem key={i} text={w.title} sub={w.date} severity={w.severity ?? 'medium'} />
+            <IntelItem key={i} text={w.title} sub={toLocalTime(w.date)} severity={w.severity ?? 'medium'} url={w.url} />
           ))}
           {who.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO DATA</div>}
         </IntelPanel>
@@ -226,7 +258,7 @@ export default function WorldPulse({ data, onRefresh }: Props) {
           {earthquakes.slice(0, 12).map((q: any, i: number) => {
             const mag = q.magnitude ?? 0
             const sev = mag >= 5 ? 'critical' : mag >= 3.5 ? 'high' : 'medium'
-            return <IntelItem key={i} text={`M${mag.toFixed(1)} ${q.title ?? q.location ?? ''}`} sub={q.time} severity={sev} />
+            return <IntelItem key={i} text={`M${mag.toFixed(1)} ${q.title ?? q.location ?? ''}`} sub={toLocalTime(q.time)} severity={sev} />
           })}
           {earthquakes.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO DATA</div>}
         </IntelPanel>
@@ -234,7 +266,7 @@ export default function WorldPulse({ data, onRefresh }: Props) {
         {/* Conflicts */}
         <IntelPanel title={t('world.conflicts')} icon="⚔️" count={conflicts.length} severityThresholds={[3, 10, 20]}>
           {conflicts.slice(0, 12).map((c: any, i: number) => (
-            <IntelItem key={i} text={c.title} sub={c.fatalities ? `${c.fatalities} ${t('world.casualties')}` : c.country} severity={c.severity ?? 'medium'} />
+            <IntelItem key={i} text={c.title} sub={c.fatalities ? `${c.fatalities} ${t('world.casualties')}` : c.country} severity={c.severity ?? 'medium'} url={c.url} />
           ))}
           {conflicts.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO DATA</div>}
         </IntelPanel>
@@ -250,7 +282,7 @@ export default function WorldPulse({ data, onRefresh }: Props) {
         {/* Disruptions */}
         <IntelPanel title={t('world.disruptions')} icon="⚠️" count={disruptions.length} severityThresholds={[2, 5, 10]}>
           {disruptions.slice(0, 12).map((d: any, i: number) => (
-            <IntelItem key={i} text={d.title} sub={d.country} severity={d.severity ?? 'medium'} />
+            <IntelItem key={i} text={d.title} sub={d.country} severity={d.severity ?? 'medium'} url={d.url} />
           ))}
           {disruptions.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO DATA</div>}
         </IntelPanel>
@@ -276,9 +308,69 @@ export default function WorldPulse({ data, onRefresh }: Props) {
         {/* Prediction Markets */}
         <IntelPanel title={t('world.polymarket')} icon="🎯" count={polymarket.length} severityThresholds={[3, 8, 15]}>
           {polymarket.slice(0, 12).map((p: any, i: number) => (
-            <IntelItem key={i} text={p.title?.slice(0, 80) ?? ''} sub={p.probability ? `${p.probability}` : undefined} severity="medium" />
+            <IntelItem key={i} text={p.title?.slice(0, 80) ?? ''} sub={p.probability ? `${p.probability}` : undefined} severity="medium" url={p.url} />
           ))}
           {polymarket.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO DATA</div>}
+        </IntelPanel>
+
+        {/* Weibo Hot Search */}
+        <IntelPanel title={isZh ? '微博热搜' : 'Weibo Hot'} icon="🔥" count={weibo.length} severityThresholds={[5, 15, 30]}>
+          {weibo.slice(0, 15).map((w: any, i: number) => (
+            <IntelItem key={i} text={w.title} sub={w.hot ? `🔥 ${Number(w.hot).toLocaleString()}` : w.label} />
+          ))}
+          {weibo.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO DATA</div>}
+        </IntelPanel>
+
+        {/* Google Trends */}
+        <IntelPanel title={isZh ? '搜索趋势' : 'Trends'} icon="📈" count={trends.length} severityThresholds={[5, 15, 30]}>
+          {trends.slice(0, 15).map((tr: any, i: number) => (
+            <IntelItem key={i} text={tr.query} sub={tr.traffic ? `${tr.traffic} · ${tr.region}` : tr.region} url={tr.url} />
+          ))}
+          {trends.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO DATA</div>}
+        </IntelPanel>
+
+        {/* Crypto */}
+        <IntelPanel title={isZh ? '加密货币' : 'Crypto'} icon="₿" count={crypto.length} severityThresholds={[5, 10, 20]}>
+          {crypto.slice(0, 15).map((c: any, i: number) => {
+            const pct = c.change_pct ?? c.price_change_percentage_24h ?? 0
+            const color = pct > 0 ? '#22c55e' : pct < 0 ? '#ef4444' : '#71717a'
+            return (
+              <div key={i} className="flex items-center justify-between py-0.5 px-1 hover:bg-white/[0.02] transition-colors">
+                <span className="text-[10px] font-mono text-zinc-400 flex-1 truncate">{c.name ?? c.symbol}</span>
+                <span className="text-[10px] font-mono text-zinc-300 mx-2">${c.current_price?.toLocaleString() ?? c.price}</span>
+                <span className="text-[10px] font-mono w-16 text-right" style={{ color }}>
+                  {pct > 0 ? '▲' : pct < 0 ? '▼' : '–'} {Math.abs(pct).toFixed(1)}%
+                </span>
+              </div>
+            )
+          })}
+          {crypto.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO DATA</div>}
+        </IntelPanel>
+
+        {/* Finance Indices */}
+        <IntelPanel title={isZh ? '全球指数' : 'Global Indices'} icon="💰" count={finance.length} severityThresholds={[3, 6, 9]}>
+          {finance.map((f: any, i: number) => {
+            const pct = f.change_pct ?? 0
+            const color = pct > 0 ? '#22c55e' : pct < 0 ? '#ef4444' : '#71717a'
+            return (
+              <div key={i} className="flex items-center justify-between py-0.5 px-1 hover:bg-white/[0.02] transition-colors">
+                <span className="text-[10px] font-mono text-zinc-400 flex-1 truncate">{f.name}</span>
+                <span className="text-[10px] font-mono text-zinc-300 mx-2">{f.price?.toLocaleString()}</span>
+                <span className="text-[10px] font-mono w-16 text-right" style={{ color }}>
+                  {pct > 0 ? '▲' : pct < 0 ? '▼' : '–'} {Math.abs(pct).toFixed(2)}%
+                </span>
+              </div>
+            )
+          })}
+          {finance.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO DATA</div>}
+        </IntelPanel>
+
+        {/* GDELT Geopolitics */}
+        <IntelPanel title={isZh ? '地缘事件' : 'GDELT Events'} icon="🌐" count={gdelt.length} severityThresholds={[5, 10, 20]}>
+          {gdelt.slice(0, 12).map((g: any, i: number) => (
+            <IntelItem key={i} text={g.title} sub={g.source} severity={g.tone < -5 ? 'critical' : g.tone < -2 ? 'high' : 'medium'} url={g.url} />
+          ))}
+          {gdelt.length === 0 && <div className="text-[10px] text-zinc-700 text-center py-6 font-mono">NO DATA</div>}
         </IntelPanel>
       </div>
 
