@@ -199,3 +199,68 @@ def format_entity_context() -> str:
         if e.get("context"):
             lines.append(f"    Context: {e['context'][:100]}")
     return "\n".join(lines)
+
+
+# --- Knowledge Graph Feedback Loop ---
+
+def enrich_graph_from_prediction(prediction: str, domain: str, confidence: float):
+    """Extract and write prediction-derived entities back into the knowledge graph.
+
+    This creates a feedback loop: predictions → graph → future context.
+    """
+    import re
+    tokens = set()
+
+    for pattern in [
+        r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b',  # multi-word proper nouns
+        r'\b(?:BTC|ETH|SOL|XRP|DOGE|NVDA|AAPL|MSFT|TSLA|META|GOOGL)\b',
+        r'\b(?:Fed|ECB|PBoC|IMF|NATO|WHO|OPEC|EU|UN|SEC|FDA)\b',
+    ]:
+        tokens.update(re.findall(pattern, prediction))
+
+    for token in tokens:
+        entity_type = "topic"
+        upper = token.upper()
+        if upper in ("BTC", "ETH", "SOL", "XRP", "DOGE"):
+            entity_type = "crypto"
+        elif upper in ("NVDA", "AAPL", "MSFT", "TSLA", "META", "GOOGL"):
+            entity_type = "company"
+        elif upper in ("FED", "ECB", "PBOC", "IMF", "NATO", "WHO", "OPEC", "EU", "UN", "SEC", "FDA"):
+            entity_type = "organization"
+        elif len(token.split()) >= 2:
+            entity_type = "person"
+
+        upsert_entity(
+            entity=token,
+            entity_type=entity_type,
+            context=f"[prediction|{domain}|conf:{confidence:.1f}] {prediction[:200]}",
+        )
+
+
+def update_graph_from_verification(prediction: str, outcome: str, evidence: str):
+    """Update entity contexts with verification outcomes.
+
+    Entities mentioned in verified predictions get enriched with outcome data,
+    improving future context quality.
+    """
+    import re
+    tokens = set()
+    for pattern in [
+        r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b',
+        r'\b(?:BTC|ETH|SOL|XRP|DOGE|NVDA|AAPL|MSFT|TSLA|META|GOOGL)\b',
+    ]:
+        tokens.update(re.findall(pattern, prediction))
+
+    for token in tokens:
+        conn = _conn()
+        existing = conn.execute(
+            "SELECT id, context FROM entity_graph WHERE entity = ?", (token,)
+        ).fetchone()
+        if existing:
+            new_context = f"[verified:{outcome}] {evidence[:200]}"
+            conn.execute(
+                "UPDATE entity_graph SET context = ?, last_seen = datetime('now') WHERE id = ?",
+                (new_context, existing["id"]),
+            )
+            conn.commit()
+        conn.close()

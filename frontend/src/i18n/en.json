@@ -1,8 +1,8 @@
 {
   "app": {
-    "title": "Pythia",
-    "subtitle": "Million-Agent Swarm Intelligence Prediction Engine",
-    "tagline": "WorldMonitor shows what's happening. Pythia tells you what happens next."
+    "title": "Tianji 天机",
+    "subtitle": "Swarm Intelligence Prediction Engine — 12 Agents · 1M Citizens · 16 Sources",
+    "tagline": "Revealing tomorrow from the data of today."
   },
   "nav": {
     "worldPulse": "World Pulse",
@@ -28,7 +28,8 @@
     "reachedSub": "information spread",
     "sources": "Data Sources",
     "sourcesSub": "all free / open",
-    "lastRound": "Last Round"
+    "lastRound": "Last Round",
+    "polarization": "Polarization"
   },
   "sections": {
     "chiefAgents": "Chief Agents",
@@ -38,13 +39,15 @@
     "simulation": "Population Simulation",
     "spreadCurve": "Information Spread Curve",
     "sentiment": "Group Sentiment",
+    "archetypes": "Agent Archetypes",
     "debate": "Roundtable Debate",
     "worldPulse": "World Pulse — Real-Time Global Intelligence",
     "entities": "Knowledge Graph — Trending Entities",
     "sourceHealth": "Data Sources",
     "noData": "No predictions yet. Click Run Prediction to start.",
     "waiting": "Waiting for first prediction round...",
-    "translate": "Translate"
+    "translate": "Translate",
+    "currentAnalysis": "Current Analysis"
   },
   "domains": {
     "politics": "Politics",
@@ -53,6 +56,12 @@
     "finance": "Finance",
     "culture": "Culture",
     "blackswan": "Black Swan",
+    "military": "Military",
+    "health": "Health",
+    "energy": "Energy",
+    "china": "China",
+    "crypto": "Crypto",
+    "supply_chain": "Supply Chain",
     "unknown": "Unknown"
   },
   "agents": {
@@ -61,7 +70,13 @@
     "Voxhunter": "Voxhunter",
     "Sharktooth": "Sharktooth",
     "Zeitgeist": "Zeitgeist",
-    "Cassandra": "Cassandra"
+    "Cassandra": "Cassandra",
+    "Sentinel": "Sentinel",
+    "Vitalis": "Vitalis",
+    "Gaia": "Gaia",
+    "Dragon": "Dragon",
+    "Phantom": "Phantom",
+    "Nexus": "Nexus"
   },
   "world": {
     "earthquakes": "Seismic Activity",
@@ -71,9 +86,18 @@
     "conflicts": "Armed Conflicts",
     "polymarket": "Prediction Markets",
     "fires": "Active Fires",
+    "newsFeed": "News Feed",
+    "stockQuotes": "Stock Quotes",
+    "macroEcon": "Macro Economy",
+    "healthAlerts": "Health Alerts",
     "noData": "No data",
     "casualties": "casualties",
-    "dataAttribution": "USGS · Open-Meteo · GDACS · ACLED · Polymarket · NASA FIRMS · GDELT · 30+ RSS"
+    "dataAttribution": "USGS · Open-Meteo · GDACS · ACLED · Polymarket · NASA FIRMS · GDELT · FRED · WHO · Finnhub · 100+ RSS",
+    "mapLayers": "Map Layers",
+    "mapConflicts": "Conflicts",
+    "mapQuakes": "Earthquakes",
+    "mapFires": "Fires",
+    "mapDisasters": "Disasters"
   },
   "groups": {
     "tech_worker": "Tech Workers",
@@ -86,6 +110,13 @@
     "govt_employee": "Govt Employees",
     "gig_worker": "Gig Workers",
     "homemaker": "Homemakers"
+  },
+  "archetypes": {
+    "follower": "Followers",
+    "amplifier": "Amplifiers",
+    "skeptic": "Skeptics",
+    "contrarian": "Contrarians",
+    "opinion_leader": "Opinion Leaders"
   },
   "confidence": "confidence",
   "wildcard": "wildcard",

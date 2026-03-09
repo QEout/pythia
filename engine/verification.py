@@ -13,13 +13,13 @@ from openai import OpenAI
 from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 from data.collector import collect_world_data
 from db.store import get_unverified_predictions, mark_verified, update_agent_score
-from agents.memory import update_memory_outcome
+from agents.memory import update_memory_outcome, update_graph_from_verification
 
 log = logging.getLogger(__name__)
 
 client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 
-VERIFY_SYSTEM = """You are the Verification Agent for Pythia, a prediction engine.
+VERIFY_SYSTEM = """You are the Verification Agent for 天机 (Tianji), a swarm intelligence prediction engine.
 
 You are given:
 1. A prediction that was made earlier
@@ -77,6 +77,11 @@ async def verify_predictions():
                 prediction=pred["prediction"],
                 outcome=verdict.get("verdict", "miss"),
                 lesson=verdict.get("lesson", ""),
+            )
+            update_graph_from_verification(
+                prediction=pred["prediction"],
+                outcome=verdict.get("verdict", "miss"),
+                evidence=verdict.get("evidence", ""),
             )
 
             results.append({

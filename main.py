@@ -1,6 +1,7 @@
-"""Pythia — Million-Agent Swarm Intelligence Prediction Engine.
+"""天机 (Tianji) — Million-Agent Swarm Intelligence Prediction Engine.
 
 FastAPI server with scheduled prediction cycles and real-time dashboard.
+泄天机于数据，见未来于群智
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -72,12 +73,12 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(scheduled_prediction, "interval", hours=PREDICTION_INTERVAL_HOURS, id="predict")
     scheduler.add_job(scheduled_verification, "interval", hours=12, id="verify")
     scheduler.start()
-    log.info("Pythia started. Prediction interval: %dh", PREDICTION_INTERVAL_HOURS)
+    log.info("天机 (Tianji) started. Prediction interval: %dh", PREDICTION_INTERVAL_HOURS)
     yield
     scheduler.shutdown()
 
 
-app = FastAPI(title="Pythia", lifespan=lifespan)
+app = FastAPI(title="天机 Tianji", lifespan=lifespan)
 
 
 build_dir = Path(__file__).parent / "dashboard_build"
@@ -96,12 +97,44 @@ async def index():
 
 @app.post("/api/predict")
 async def trigger_prediction():
-    """Manually trigger a prediction cycle."""
+    """Manually trigger a prediction cycle (batch mode)."""
     global latest_round
     result = await run_prediction_cycle()
     latest_round = result
     await broadcast({"type": "prediction_update", "data": result})
     return JSONResponse(result)
+
+
+@app.get("/api/predict/stream")
+async def trigger_prediction_stream():
+    """SSE streaming prediction — sends progress events as each step completes."""
+    from engine.prediction import run_prediction_cycle_streaming
+
+    async def event_generator():
+        final_result = None
+        async for event_str in run_prediction_cycle_streaming():
+            yield event_str
+            if event_str.startswith("event: complete"):
+                data_line = event_str.split("data: ", 1)[1].split("\n")[0]
+                try:
+                    final_result = json.loads(data_line)
+                except Exception:
+                    pass
+
+        if final_result:
+            global latest_round
+            latest_round = final_result
+            await broadcast({"type": "prediction_update", "data": final_result})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/api/verify")
@@ -134,7 +167,7 @@ async def get_latest():
             "simulation": sim,
             "chief_analyses": [],
         })
-    return JSONResponse({"message": "No predictions yet. Trigger one with POST /api/predict"})
+    return JSONResponse({"message": "暂无预测。请使用 POST /api/predict 触发第一轮预测。"})
 
 
 @app.get("/api/history")
@@ -148,29 +181,44 @@ async def get_history():
 
 @app.get("/api/world")
 async def get_world_data():
-    """Fetch current WorldMonitor + extended intelligence data for the dashboard."""
+    """Fetch all intelligence data for the World Intel tab (16 sources)."""
     from data.sources.worldmonitor import fetch_all_worldmonitor
     from data.sources.acled import fetch_acled_conflicts
     from data.sources.polymarket import fetch_polymarket
     from data.sources.nasa_firms import fetch_active_fires
-    from data.cache import cached_fetch, TTL_LONG, TTL_MEDIUM, TTL_EXTENDED
+    from data.sources.fred import fetch_fred_indicators
+    from data.sources.who import fetch_who_alerts
+    from data.sources.finnhub import fetch_stock_quotes
+    from data.sources.news import fetch_news
+    from data.cache import cached_fetch, TTL_SHORT, TTL_LONG, TTL_MEDIUM, TTL_EXTENDED
     try:
-        wm, conflicts, markets, fires = await asyncio.gather(
+        wm, conflicts, markets, fires, fred, who, stocks, news_items = await asyncio.gather(
             cached_fetch("worldmonitor", fetch_all_worldmonitor, TTL_LONG),
             cached_fetch("acled", fetch_acled_conflicts, TTL_EXTENDED),
             cached_fetch("polymarket", fetch_polymarket, TTL_MEDIUM),
             cached_fetch("fires", fetch_active_fires, TTL_LONG),
+            cached_fetch("fred", fetch_fred_indicators, TTL_LONG),
+            cached_fetch("who", fetch_who_alerts, TTL_LONG),
+            cached_fetch("finnhub", fetch_stock_quotes, TTL_SHORT),
+            cached_fetch("news", fetch_news, TTL_MEDIUM),
             return_exceptions=True,
         )
         result = wm if isinstance(wm, dict) else {"earthquakes": [], "climate": [], "disruptions": [], "markets": []}
         result["conflicts"] = conflicts if isinstance(conflicts, list) else []
         result["prediction_markets"] = markets if isinstance(markets, list) else []
         result["fires"] = fires if isinstance(fires, list) else []
-        result["signals"] = []
+        result["fred"] = fred if isinstance(fred, list) else []
+        result["who"] = who if isinstance(who, list) else []
+        result["stocks"] = stocks if isinstance(stocks, list) else []
+        result["news_headlines"] = (news_items if isinstance(news_items, list) else [])[:50]
         return JSONResponse(result)
     except Exception as e:
         log.error("World data fetch failed: %s", e)
-        return JSONResponse({"earthquakes": [], "climate": [], "disruptions": [], "markets": [], "signals": []})
+        return JSONResponse({
+            "earthquakes": [], "climate": [], "disruptions": [], "markets": [],
+            "conflicts": [], "prediction_markets": [], "fires": [],
+            "fred": [], "who": [], "stocks": [], "news_headlines": [],
+        })
 
 
 @app.get("/api/agents")
@@ -192,11 +240,187 @@ async def get_agents():
     ])
 
 
+@app.get("/api/agent/{agent_name}")
+async def get_agent_detail(agent_name: str):
+    """Deep detail for a single agent: personality, memory, related news, predictions."""
+    from agents.chief_agents import CHIEFS
+    from agents.memory import get_agent_episodic_memory, get_trending_entities
+    from data.cache import cached_fetch, TTL_LONG, TTL_MEDIUM, TTL_EXTENDED
+
+    agent = next((a for a in CHIEFS if a.name.lower() == agent_name.lower()), None)
+    if not agent:
+        return JSONResponse({"error": "Agent not found"}, status_code=404)
+
+    score_list = get_agent_scores()
+    score = next((s for s in score_list if s["agent_name"] == agent.name), {"total": 0, "hits": 0, "accuracy": 0})
+    memory = get_agent_episodic_memory(agent.name, limit=15)
+
+    from db.store import get_conn
+    conn = get_conn()
+    recent_preds = [dict(r) for r in conn.execute(
+        "SELECT prediction, confidence, reasoning, verified, verify_note, ts FROM predictions WHERE agent_name = ? ORDER BY ts DESC LIMIT 10",
+        (agent.name,),
+    ).fetchall()]
+    conn.close()
+
+    domain_news = []
+    try:
+        from data.sources.rss import fetch_rss_feeds
+        from data.sources.worldmonitor import fetch_all_worldmonitor
+        from data.cache import cached_fetch, TTL_LONG
+        wm = await cached_fetch("worldmonitor", fetch_all_worldmonitor, TTL_LONG)
+        if isinstance(wm, dict):
+            domain_map = {
+                "politics": ["disruptions"],
+                "tech": [],
+                "opinion": [],
+                "finance": ["markets"],
+                "culture": [],
+                "blackswan": ["earthquakes", "disruptions", "climate"],
+                "military": ["conflicts"],
+                "health": [],
+                "energy": ["climate"],
+                "china": [],
+                "crypto": ["markets"],
+                "supply_chain": ["disruptions"],
+            }
+            keys = domain_map.get(agent.domain, [])
+            for key in keys:
+                items = wm.get(key, [])
+                for item in items[:5]:
+                    if isinstance(item, dict):
+                        domain_news.append({
+                            "title": item.get("title", ""),
+                            "category": key,
+                            "time": item.get("time", item.get("ts", "")),
+                        })
+        from data.sources.acled import fetch_acled_conflicts
+        if agent.domain in ("military", "politics", "blackswan"):
+            conflicts = await cached_fetch("acled", fetch_acled_conflicts, TTL_EXTENDED)
+            if isinstance(conflicts, list):
+                for c in conflicts[:5]:
+                    if isinstance(c, dict):
+                        domain_news.append({"title": c.get("title", ""), "category": "conflict", "time": c.get("ts", "")})
+        if agent.domain in ("crypto", "finance"):
+            from data.sources.polymarket import fetch_polymarket
+            poly = await cached_fetch("polymarket", fetch_polymarket, TTL_MEDIUM)
+            if isinstance(poly, list):
+                for p in poly[:5]:
+                    if isinstance(p, dict):
+                        domain_news.append({"title": p.get("title", ""), "category": "prediction_market", "time": ""})
+    except Exception as e:
+        log.warning("Failed to fetch domain news for %s: %s", agent.name, e)
+
+    entities = get_trending_entities(10)
+
+    return JSONResponse({
+        "name": agent.name,
+        "name_cn": agent.name_cn,
+        "emoji": agent.emoji,
+        "domain": agent.domain,
+        "personality": agent.personality,
+        "score": score,
+        "memory": memory,
+        "recent_predictions": recent_preds,
+        "domain_news": domain_news[:15],
+        "related_entities": [e for e in entities if any(
+            kw in (e.get("context") or "").lower() for kw in [agent.domain]
+        )][:8],
+    })
+
+
 @app.get("/api/entities")
 async def get_entities():
-    """Get trending entities from the knowledge graph."""
-    entities = get_trending_entities(20)
+    """Get trending entities from the knowledge graph with full context."""
+    entities = get_trending_entities(30)
     return JSONResponse(entities)
+
+
+@app.get("/api/entity/{entity_name}")
+async def get_entity_detail(entity_name: str):
+    """Deep detail for a single entity: context, related predictions, connections, timeline."""
+    from db.store import get_conn
+    from agents.memory import _conn as mem_conn_fn
+
+    conn = mem_conn_fn()
+    row = conn.execute(
+        "SELECT * FROM entity_graph WHERE entity = ? COLLATE NOCASE", (entity_name,)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return JSONResponse({"error": "Entity not found"}, status_code=404)
+
+    entity = dict(row)
+    relations_raw = entity.get("relations") or "[]"
+    try:
+        relations = json.loads(relations_raw) if isinstance(relations_raw, str) else relations_raw
+    except Exception:
+        relations = []
+
+    related_entities = []
+    for r in relations[:10]:
+        rel_row = conn.execute(
+            "SELECT entity, entity_type, mention_count FROM entity_graph WHERE entity = ? COLLATE NOCASE",
+            (r,)
+        ).fetchone()
+        if rel_row:
+            related_entities.append(dict(rel_row))
+
+    co_occurring = conn.execute(
+        """SELECT entity, entity_type, mention_count, context
+           FROM entity_graph
+           WHERE entity != ? COLLATE NOCASE
+             AND (context LIKE ? OR entity_type = ?)
+           ORDER BY mention_count DESC LIMIT 10""",
+        (entity_name, f"%{entity_name}%", entity.get("entity_type", "")),
+    ).fetchall()
+    conn.close()
+
+    db_conn = get_conn()
+    related_preds = db_conn.execute(
+        """SELECT prediction, confidence, agent_name, domain, verified, verify_note, ts
+           FROM predictions
+           WHERE prediction LIKE ?
+           ORDER BY ts DESC LIMIT 15""",
+        (f"%{entity_name}%",),
+    ).fetchall()
+
+    agent_mentions = db_conn.execute(
+        """SELECT agent_name, prediction, confidence, outcome, ts
+           FROM agent_memory
+           WHERE prediction LIKE ?
+           ORDER BY ts DESC LIMIT 10""",
+        (f"%{entity_name}%",),
+    ).fetchall()
+    db_conn.close()
+
+    contexts = (entity.get("context") or "").split("] ")
+    parsed_contexts = []
+    for ctx in contexts:
+        ctx = ctx.strip()
+        if not ctx:
+            continue
+        if ctx.startswith("["):
+            parts = ctx.split("] ", 1)
+            meta = parts[0].lstrip("[")
+            text = parts[1] if len(parts) > 1 else ""
+        else:
+            meta = ""
+            text = ctx
+        parsed_contexts.append({"meta": meta, "text": text[:200]})
+
+    return JSONResponse({
+        "entity": entity.get("entity", entity_name),
+        "entity_type": entity.get("entity_type", "topic"),
+        "mention_count": entity.get("mention_count", 0),
+        "first_seen": entity.get("first_seen", ""),
+        "last_seen": entity.get("last_seen", ""),
+        "contexts": parsed_contexts[-10:],
+        "relations": relations,
+        "related_entities": related_entities + [dict(r) for r in co_occurring if dict(r)["entity"] != entity_name],
+        "related_predictions": [dict(r) for r in related_preds],
+        "agent_mentions": [dict(r) for r in agent_mentions],
+    })
 
 
 @app.get("/api/cache")

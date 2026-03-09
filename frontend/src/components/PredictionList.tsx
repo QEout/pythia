@@ -8,14 +8,19 @@ interface Props {
 }
 
 const DOMAIN_STYLE: Record<string, { border: string; text: string; bg: string; dot: string }> = {
-  politics: { border: 'border-l-violet-500', text: 'text-violet-400', bg: 'bg-violet-500/10', dot: 'bg-violet-500' },
-  tech: { border: 'border-l-cyan-500', text: 'text-cyan-400', bg: 'bg-cyan-500/10', dot: 'bg-cyan-500' },
-  technology: { border: 'border-l-cyan-500', text: 'text-cyan-400', bg: 'bg-cyan-500/10', dot: 'bg-cyan-500' },
-  'technology/social media': { border: 'border-l-cyan-500', text: 'text-cyan-400', bg: 'bg-cyan-500/10', dot: 'bg-cyan-500' },
-  opinion: { border: 'border-l-amber-500', text: 'text-amber-400', bg: 'bg-amber-500/10', dot: 'bg-amber-500' },
-  finance: { border: 'border-l-emerald-500', text: 'text-emerald-400', bg: 'bg-emerald-500/10', dot: 'bg-emerald-500' },
-  culture: { border: 'border-l-pink-500', text: 'text-pink-400', bg: 'bg-pink-500/10', dot: 'bg-pink-500' },
-  blackswan: { border: 'border-l-red-500', text: 'text-red-400', bg: 'bg-red-500/10', dot: 'bg-red-500' },
+  politics:     { border: 'border-l-violet-500',  text: 'text-violet-400',  bg: 'bg-violet-500/10',  dot: 'bg-violet-500' },
+  tech:         { border: 'border-l-cyan-500',    text: 'text-cyan-400',    bg: 'bg-cyan-500/10',    dot: 'bg-cyan-500' },
+  technology:   { border: 'border-l-cyan-500',    text: 'text-cyan-400',    bg: 'bg-cyan-500/10',    dot: 'bg-cyan-500' },
+  opinion:      { border: 'border-l-amber-500',   text: 'text-amber-400',   bg: 'bg-amber-500/10',   dot: 'bg-amber-500' },
+  finance:      { border: 'border-l-emerald-500', text: 'text-emerald-400', bg: 'bg-emerald-500/10', dot: 'bg-emerald-500' },
+  culture:      { border: 'border-l-pink-500',    text: 'text-pink-400',    bg: 'bg-pink-500/10',    dot: 'bg-pink-500' },
+  blackswan:    { border: 'border-l-red-500',     text: 'text-red-400',     bg: 'bg-red-500/10',     dot: 'bg-red-500' },
+  military:     { border: 'border-l-slate-500',   text: 'text-slate-400',   bg: 'bg-slate-500/10',   dot: 'bg-slate-500' },
+  health:       { border: 'border-l-green-500',   text: 'text-green-400',   bg: 'bg-green-500/10',   dot: 'bg-green-500' },
+  energy:       { border: 'border-l-teal-500',    text: 'text-teal-400',    bg: 'bg-teal-500/10',    dot: 'bg-teal-500' },
+  china:        { border: 'border-l-red-500',     text: 'text-red-400',     bg: 'bg-red-500/10',     dot: 'bg-red-500' },
+  crypto:       { border: 'border-l-orange-500',  text: 'text-orange-400',  bg: 'bg-orange-500/10',  dot: 'bg-orange-500' },
+  supply_chain: { border: 'border-l-blue-500',    text: 'text-blue-400',    bg: 'bg-blue-500/10',    dot: 'bg-blue-500' },
 }
 
 function ConfidenceArc({ value, size = 48 }: { value: number; size?: number }) {

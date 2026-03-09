@@ -7,6 +7,8 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 NEWSAPI_KEY = os.getenv("NEWSAPI_KEY", "")
+FRED_API_KEY = os.getenv("FRED_API_KEY", "")
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 
 PREDICTION_INTERVAL_HOURS = int(os.getenv("PREDICTION_INTERVAL_HOURS", "6"))
 CITIZEN_AGENT_COUNT = int(os.getenv("CITIZEN_AGENT_COUNT", "1000000"))

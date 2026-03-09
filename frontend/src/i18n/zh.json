@@ -1,8 +1,8 @@
 {
   "app": {
-    "title": "Pythia 预言机",
-    "subtitle": "百万智能体群体智能预测引擎",
-    "tagline": "WorldMonitor 展示正在发生的事。Pythia 告诉你接下来会发生什么。"
+    "title": "天机",
+    "subtitle": "群体智能预测引擎 — 12 智能体 · 百万公民 · 16 数据源",
+    "tagline": "泄天机于数据，见未来于群智"
   },
   "nav": {
     "worldPulse": "全球脉搏",
@@ -28,7 +28,8 @@
     "reachedSub": "信息扩散率",
     "sources": "数据源",
     "sourcesSub": "全部免费/开放",
-    "lastRound": "最近轮次"
+    "lastRound": "最近轮次",
+    "polarization": "极化指数"
   },
   "sections": {
     "chiefAgents": "首席智能体",
@@ -38,13 +39,15 @@
     "simulation": "群体传播仿真",
     "spreadCurve": "信息扩散曲线",
     "sentiment": "群体情绪分布",
+    "archetypes": "智能体类型分布",
     "debate": "圆桌辩论",
     "worldPulse": "全球脉搏 — 实时全球情报",
     "entities": "知识图谱 — 热门实体",
     "sourceHealth": "数据源状态",
     "noData": "暂无预测。点击「启动预测」开始。",
     "waiting": "等待首次预测...",
-    "translate": "翻译"
+    "translate": "翻译",
+    "currentAnalysis": "本轮分析"
   },
   "domains": {
     "politics": "政治",
@@ -53,6 +56,12 @@
     "finance": "金融",
     "culture": "文化",
     "blackswan": "黑天鹅",
+    "military": "军事",
+    "health": "健康",
+    "energy": "能源",
+    "china": "中国",
+    "crypto": "加密货币",
+    "supply_chain": "供应链",
     "unknown": "未知"
   },
   "agents": {
@@ -61,7 +70,13 @@
     "Voxhunter": "舆情猎手",
     "Sharktooth": "金融鲨鱼",
     "Zeitgeist": "文化风向",
-    "Cassandra": "黑天鹅猎人"
+    "Cassandra": "黑天鹅猎人",
+    "Sentinel": "铁壁参谋",
+    "Vitalis": "疫情守望",
+    "Gaia": "盖亚之眼",
+    "Dragon": "龙脉探针",
+    "Phantom": "链上幽灵",
+    "Nexus": "供应链猎手"
   },
   "world": {
     "earthquakes": "地震活动",
@@ -71,9 +86,18 @@
     "conflicts": "武装冲突",
     "polymarket": "预测市场",
     "fires": "卫星火点",
+    "newsFeed": "新闻头条",
+    "stockQuotes": "实时股票",
+    "macroEcon": "宏观经济",
+    "healthAlerts": "健康预警",
     "noData": "暂无数据",
     "casualties": "伤亡",
-    "dataAttribution": "USGS · Open-Meteo · GDACS · ACLED · Polymarket · NASA FIRMS · GDELT · 30+ RSS"
+    "dataAttribution": "USGS · Open-Meteo · GDACS · ACLED · Polymarket · NASA FIRMS · GDELT · FRED · WHO · Finnhub · 100+ RSS",
+    "mapLayers": "地图图层",
+    "mapConflicts": "冲突",
+    "mapQuakes": "地震",
+    "mapFires": "火点",
+    "mapDisasters": "灾害"
   },
   "groups": {
     "tech_worker": "科技从业者",
@@ -86,6 +110,13 @@
     "govt_employee": "公务员",
     "gig_worker": "自由职业",
     "homemaker": "家庭主妇/夫"
+  },
+  "archetypes": {
+    "follower": "跟随者",
+    "amplifier": "放大器",
+    "skeptic": "怀疑者",
+    "contrarian": "反向操作者",
+    "opinion_leader": "意见领袖"
   },
   "confidence": "置信度",
   "wildcard": "黑天鹅",

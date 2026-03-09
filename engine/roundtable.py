@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 
-ROUNDTABLE_SYSTEM = """You are the Moderator of Pythia's Roundtable — a debate among 6 AI agents predicting the future.
+ROUNDTABLE_SYSTEM = """You are the Moderator of 天机 (Tianji)'s Roundtable — a debate among 12 AI agents predicting the future.
 
 You have received analysis and predictions from 6 specialist agents. Your job:
 

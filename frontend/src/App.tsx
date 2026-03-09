@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useApi } from './hooks/useApi'
@@ -12,6 +12,7 @@ import DebateLog from './components/DebateLog'
 import WorldPulse from './components/WorldPulse'
 import EntityGraph from './components/EntityGraph'
 import SourceHealth from './components/SourceHealth'
+import StreamingProgress from './components/StreamingProgress'
 
 interface PredictionRound {
   round_id: string
@@ -40,6 +41,14 @@ export default function App() {
   const [predicting, setPredicting] = useState(false)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [agentScores, setAgentScores] = useState<Record<string, any>>({})
+
+  // Streaming state
+  const [streamStep, setStreamStep] = useState<any>(null)
+  const [streamAgents, setStreamAgents] = useState<any[]>([])
+  const [streamRoundtable, setStreamRoundtable] = useState<any>(null)
+  const [streamEntities, setStreamEntities] = useState<any>(null)
+  const [streamComplete, setStreamComplete] = useState(false)
+  const eventSourceRef = useRef<EventSource | null>(null)
 
   const { connected, lastMessage } = useWebSocket('/ws')
   const latestApi = useApi<PredictionRound>('/api/latest')
@@ -74,16 +83,71 @@ export default function App() {
     }
   }, [activeTab])
 
-  const handlePredict = async () => {
+  const handlePredict = useCallback(() => {
+    if (predicting) return
     setPredicting(true)
-    try {
-      const r = await fetch('/api/predict', { method: 'POST' })
-      if (!r.ok) throw new Error()
-      const d = await r.json()
-      if (d.round_id) setRound(d)
-    } catch { /* ws will deliver it */ }
-    finally { setPredicting(false) }
-  }
+    setStreamStep(null)
+    setStreamAgents([])
+    setStreamRoundtable(null)
+    setStreamEntities(null)
+    setStreamComplete(false)
+
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+    }
+
+    const es = new EventSource('/api/predict/stream')
+    eventSourceRef.current = es
+
+    es.addEventListener('step', (e) => {
+      try { setStreamStep(JSON.parse(e.data)) } catch {}
+    })
+
+    es.addEventListener('agent_done', (e) => {
+      try {
+        const agent = JSON.parse(e.data)
+        setStreamAgents(prev => [...prev, agent])
+      } catch {}
+    })
+
+    es.addEventListener('roundtable_done', (e) => {
+      try { setStreamRoundtable(JSON.parse(e.data)) } catch {}
+    })
+
+    es.addEventListener('entities', (e) => {
+      try { setStreamEntities(JSON.parse(e.data)) } catch {}
+    })
+
+    es.addEventListener('complete', (e) => {
+      try {
+        const result = JSON.parse(e.data)
+        setRound(result)
+        setStreamComplete(true)
+        setPredicting(false)
+        setTimeout(() => {
+          setStreamStep(null)
+          setStreamAgents([])
+          setStreamRoundtable(null)
+          setStreamEntities(null)
+          setStreamComplete(false)
+        }, 3000)
+      } catch {}
+      es.close()
+      eventSourceRef.current = null
+    })
+
+    es.onerror = () => {
+      es.close()
+      eventSourceRef.current = null
+      setPredicting(false)
+    }
+  }, [predicting])
+
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) eventSourceRef.current.close()
+    }
+  }, [])
 
   const handleToggleLang = () => {
     const next = i18n.language === 'en' ? 'zh' : 'en'
@@ -110,6 +174,19 @@ export default function App() {
       <Ticker worldData={worldApi.data} />
 
       <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6">
+        {/* Streaming progress overlay */}
+        {predicting && streamStep && (
+          <div className="mb-6">
+            <StreamingProgress
+              currentStep={streamStep}
+              completedAgents={streamAgents}
+              roundtableResult={streamRoundtable}
+              entityInfo={streamEntities}
+              isComplete={streamComplete}
+            />
+          </div>
+        )}
+
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fade-in">
@@ -150,7 +227,7 @@ export default function App() {
         {/* World Tab */}
         {activeTab === 'world' && (
           <div className="animate-fade-in">
-            <WorldPulse data={worldApi.data} />
+            <WorldPulse data={worldApi.data} onRefresh={() => worldApi.fetch()} />
           </div>
         )}
 
@@ -164,7 +241,7 @@ export default function App() {
 
       <footer className="border-t border-border py-6 mt-12">
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 flex items-center justify-between text-[10px] text-zinc-700">
-          <span>Pythia — Open-source swarm intelligence prediction engine</span>
+          <span>天机 Tianji — Open-source swarm intelligence prediction engine</span>
           <div className="flex items-center gap-4">
             <a href="https://github.com/" className="hover:text-zinc-400 transition">GitHub</a>
             <span className="text-zinc-800">v1.0.0</span>
